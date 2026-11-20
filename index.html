@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MC2026 Forecast</title>
-<meta name="description" content="Monte Carlo delivery forecast for the MC2026 backlog." />
+<meta name="description" content="Monte Carlo delivery forecast for the MC2026 backlog and the Epic roadmap." />
 <style>
   :root {
     color-scheme: light;
@@ -16,14 +16,14 @@
     --grid: #e1e0d9;
     --axis: #c3c2b7;
     --border: rgba(11,11,11,0.10);
-    --series-a: #2a78d6;   /* blue  - fixed scope */
-    --series-b: #eb6834;   /* orange - scope creep */
+    --series-a: #2a78d6;   /* blue  - fixed scope / current */
+    --series-b: #eb6834;   /* orange - scope creep / baseline */
     --accent-85: #eda100;  /* amber */
     --accent-95: #d03b3b;  /* red   */
+    --accent-70: #7a5bd0;  /* violet */
     --good: #0ca30c;
+    --band: rgba(42,120,214,0.14);
     --shadow: 0 1px 3px rgba(11,11,11,0.06), 0 8px 24px rgba(11,11,11,0.04);
-  }
-  :root[data-theme="dark"], :root:not([data-theme="light"]) {
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -40,7 +40,9 @@
       --series-b: #d95926;
       --accent-85: #fab219;
       --accent-95: #e66767;
+      --accent-70: #9d82e6;
       --good: #0ca30c;
+      --band: rgba(57,135,229,0.20);
       --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
     }
   }
@@ -58,7 +60,9 @@
     --series-b: #d95926;
     --accent-85: #fab219;
     --accent-95: #e66767;
+    --accent-70: #9d82e6;
     --good: #0ca30c;
+    --band: rgba(57,135,229,0.20);
     --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
   }
 
@@ -82,7 +86,15 @@
   }
   .theme-btn:hover { color: var(--text-1); }
 
-  /* Prognosis toggle */
+  /* ---- Tabs ---- */
+  .tabs { display: inline-flex; gap: 4px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 4px; box-shadow: var(--shadow); margin: 18px 0 6px; }
+  .tabs button { border: 0; background: transparent; color: var(--text-2); font-family: inherit;
+    font-size: 0.95rem; font-weight: 700; padding: 9px 18px; border-radius: 9px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--text-1); color: var(--plane); }
+  .panel[hidden] { display: none; }
+
+  /* Prognosis toggle (backlog tab) */
   .toggle-row { margin: 22px 0 6px; }
   .toggle-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
   .seg {
@@ -115,13 +127,16 @@
   .card .tag { display:inline-block; font-size: 0.72rem; font-weight:700; padding: 2px 8px; border-radius: 999px; margin-bottom: 6px; }
   .tag-85 { background: color-mix(in srgb, var(--accent-85) 18%, transparent); color: var(--accent-85); }
   .tag-95 { background: color-mix(in srgb, var(--accent-95) 18%, transparent); color: var(--accent-95); }
+  .tag-70 { background: color-mix(in srgb, var(--accent-70) 18%, transparent); color: var(--accent-70); }
   .tag-50 { background: color-mix(in srgb, var(--text-2) 14%, transparent); color: var(--text-2); }
+  .tag-good { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
 
   /* Charts */
   .chart-card {
     background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
     padding: 18px 18px 10px; box-shadow: var(--shadow); margin-top: 18px;
   }
+  .chart-head { display:flex; align-items:flex-start; justify-content:space-between; gap: 10px; }
   .chart-title { font-size: 1.02rem; font-weight: 700; margin: 0 0 2px; }
   .chart-desc { font-size: 0.86rem; color: var(--text-2); margin: 0 0 12px; }
   svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
@@ -129,8 +144,15 @@
   .legend-inline span { display: inline-flex; align-items: center; gap: 6px; }
   .legend-inline i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
   .legend-inline i.dash { height: 0; border-top: 2px dashed currentColor; }
+  .legend-inline i.sq { width: 12px; height: 12px; border-radius: 3px; }
 
-  /* Assumptions */
+  /* "?" explain button */
+  .qbtn { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--plane); color: var(--text-2); font-weight: 800; font-size: 0.8rem; cursor: pointer;
+    line-height: 1; font-family: inherit; }
+  .qbtn:hover { color: var(--text-1); border-color: var(--axis); }
+
+  /* Assumptions / controls */
   details.assume { margin-top: 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
   details.assume > summary { cursor: pointer; padding: 14px 18px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 8px; }
   details.assume > summary::-webkit-details-marker { display: none; }
@@ -138,16 +160,19 @@
   details.assume[open] > summary::before { transform: rotate(90deg); }
   .assume-body { padding: 4px 18px 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 14px 18px; align-items: end; }
   .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.wide { grid-column: 1 / -1; }
   .field label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; }
-  .field input {
+  .field input, .field select {
     font-family: inherit; font-size: 0.92rem; padding: 8px 10px; border-radius: 9px;
     border: 1px solid var(--border); background: var(--plane); color: var(--text-1);
   }
+  .field input[type="range"] { padding: 0; }
   .field .hint { font-size: 0.74rem; color: var(--muted); }
   .assume-actions { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .run-btn { background: var(--series-a); color: #fff; border: 0; border-radius: 10px; padding: 10px 20px; font-weight: 700; font-family: inherit; font-size: 0.92rem; cursor: pointer; }
   .run-btn:hover { filter: brightness(1.05); }
   .reset-btn { background: transparent; color: var(--text-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; font-family: inherit; cursor: pointer; }
+  .reset-btn:hover { color: var(--text-1); }
   .err { color: var(--accent-95); font-size: 0.85rem; }
 
   /* Data table */
@@ -157,6 +182,32 @@
   th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--grid); }
   th:first-child, td:first-child { text-align: left; }
   thead th { color: var(--muted); font-weight: 600; font-size: 0.8rem; }
+
+  /* Editable sub-tables (epics, history, multipliers, overrides) */
+  table.edit td, table.edit th { padding: 5px 7px; vertical-align: middle; }
+  table.edit input { width: 100%; min-width: 48px; font-family: inherit; font-size: 0.86rem; padding: 6px 7px;
+    border-radius: 7px; border: 1px solid var(--border); background: var(--plane); color: var(--text-1); }
+  table.edit input[type="checkbox"] { width: auto; }
+  .mini-btn { border: 1px solid var(--border); background: var(--plane); color: var(--text-2); border-radius: 7px;
+    padding: 5px 9px; font-family: inherit; font-size: 0.82rem; cursor: pointer; }
+  .mini-btn:hover { color: var(--text-1); }
+  .mini-btn.danger:hover { color: var(--accent-95); border-color: var(--accent-95); }
+  .row-excluded td:not(:first-child) { opacity: 0.4; }
+  .ctl-section { grid-column: 1/-1; border-top: 1px solid var(--grid); padding-top: 14px; margin-top: 4px; }
+  .ctl-section h4 { margin: 0 0 8px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .focus-note { grid-column:1/-1; font-size: 0.82rem; color: var(--text-2); background: color-mix(in srgb, var(--accent-85) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-85) 30%, transparent); border-radius: 9px; padding: 9px 12px; }
+
+  /* Warnings */
+  .warns { margin: 16px 0 0; display: flex; flex-direction: column; gap: 8px; }
+  .warn { font-size: 0.86rem; padding: 9px 12px; border-radius: 9px; display:flex; gap:8px; align-items:flex-start; }
+  .warn.caution { background: color-mix(in srgb, var(--accent-85) 12%, transparent); border:1px solid color-mix(in srgb, var(--accent-85) 34%, transparent); color: var(--text-1); }
+  .warn.bad { background: color-mix(in srgb, var(--accent-95) 12%, transparent); border:1px solid color-mix(in srgb, var(--accent-95) 34%, transparent); color: var(--text-1); }
+  .warn b { font-weight: 800; }
+
+  /* Scenario bar */
+  .scenario-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin: 16px 0 2px; }
+  .scenario-bar select, .scenario-bar input { font-family:inherit; font-size:0.86rem; padding:7px 9px; border-radius:9px; border:1px solid var(--border); background:var(--surface); color:var(--text-1); }
 
   footer.note { margin-top: 28px; font-size: 0.8rem; color: var(--muted); line-height: 1.6; }
   footer.note code { background: color-mix(in srgb, var(--muted) 16%, transparent); padding: 1px 5px; border-radius: 4px; }
@@ -170,6 +221,29 @@
   #tip b { font-weight: 700; }
   .bar { transition: opacity .1s; }
   .bar:hover { opacity: 0.78; }
+
+  /* Explain drawer */
+  #drawer { position: fixed; top:0; right:0; height:100%; width: min(440px, 92vw); background: var(--surface);
+    border-left: 1px solid var(--border); box-shadow: -8px 0 30px rgba(0,0,0,0.18); z-index: 60;
+    transform: translateX(100%); transition: transform .22s ease; display:flex; flex-direction:column; }
+  #drawer.open { transform: translateX(0); }
+  #drawer .d-head { display:flex; align-items:center; justify-content:space-between; padding: 16px 18px; border-bottom:1px solid var(--grid); }
+  #drawer .d-head h3 { margin:0; font-size:1.05rem; }
+  #drawer .d-body { padding: 16px 18px 40px; overflow:auto; font-size:0.9rem; color: var(--text-1); }
+  #drawer .d-body h4 { margin: 16px 0 4px; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+  #drawer .d-body p { margin: 4px 0 10px; color: var(--text-2); }
+  #drawer .d-body code { background: color-mix(in srgb, var(--muted) 16%, transparent); padding: 1px 5px; border-radius: 4px; }
+  #drawer .d-body table { font-size: 0.82rem; }
+  #drawer .close { border:0; background:transparent; color:var(--text-2); font-size:1.4rem; cursor:pointer; line-height:1; }
+  #scrim { position: fixed; inset:0; background: rgba(0,0,0,0.3); z-index:55; opacity:0; pointer-events:none; transition:opacity .2s; }
+  #scrim.open { opacity:1; pointer-events:auto; }
+  .explain-actions { display:flex; flex-wrap:wrap; gap:8px; margin: 10px 0 0; }
+
+  @media print {
+    .tabs, .theme-btn, .assume, .explain-actions, .scenario-bar, #drawer, #scrim, .qbtn, .mini-btn { display:none !important; }
+    .panel[hidden] { display:block !important; }
+    .chart-card, .card { box-shadow:none; }
+  }
 </style>
 </head>
 <body>
@@ -177,103 +251,355 @@
   <header class="top">
     <div>
       <h1>MC2026 — Delivery Forecast</h1>
-      <p class="sub">Monte Carlo simulation · <span id="trials-sub"></span> trials · bootstrap of historical throughput</p>
+      <p class="sub">Monte Carlo simulation · bootstrap of historical throughput · reproducible &amp; fully in your browser</p>
     </div>
     <button class="theme-btn" id="themeBtn" type="button">◐ Theme</button>
   </header>
 
-  <div class="toggle-row">
-    <div class="toggle-label">Prognosis</div>
-    <div class="seg" role="group" aria-label="Choose prognosis">
-      <button type="button" data-k="A" aria-pressed="true"><span class="dot"></span>Fixed scope</button>
-      <button type="button" data-k="B" aria-pressed="false"><span class="dot"></span>+ Scope creep 20–30%</button>
+  <nav class="tabs" role="tablist" aria-label="Forecast views">
+    <button type="button" role="tab" data-tab="backlog" aria-selected="true">Backlog forecast</button>
+    <button type="button" role="tab" data-tab="epic" aria-selected="false">Epic forecast</button>
+  </nav>
+
+  <!-- ===================== TAB 1: BACKLOG (existing) ===================== -->
+  <div id="panel-backlog" class="panel" role="tabpanel">
+    <p class="sub" style="margin-top:14px">Backlog clear-down · <span id="trials-sub"></span> trials</p>
+
+    <div class="toggle-row">
+      <div class="toggle-label">Prognosis</div>
+      <div class="seg" role="group" aria-label="Choose prognosis">
+        <button type="button" data-k="A" aria-pressed="true"><span class="dot"></span>Fixed scope</button>
+        <button type="button" data-k="B" aria-pressed="false"><span class="dot"></span>+ Scope creep 20–30%</button>
+      </div>
+      <p class="scenario-note" id="scenarioNote"></p>
     </div>
-    <p class="scenario-note" id="scenarioNote"></p>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="chart-card">
+      <h2 class="chart-title">When will all items be done?</h2>
+      <p class="chart-desc">Distribution of the iteration (and date) on which the backlog is cleared, across all trials.</p>
+      <svg class="chart" id="chartFinish" viewBox="0 0 820 340" role="img" aria-label="Histogram of completion dates"></svg>
+      <div class="legend-inline">
+        <span style="color:var(--accent-85)"><i class="dash"></i> 85% probability</span>
+        <span style="color:var(--accent-95)"><i class="dash"></i> 95% probability</span>
+        <span style="color:var(--text-2)"><i class="dash"></i> 50% (median)</span>
+      </div>
+    </section>
+
+    <section class="chart-card">
+      <h2 class="chart-title">Probability of being finished over time</h2>
+      <p class="chart-desc">Cumulative chance the whole backlog is complete by the end of each iteration.</p>
+      <svg class="chart" id="chartCdf" viewBox="0 0 820 340" role="img" aria-label="Cumulative completion probability curve"></svg>
+    </section>
+
+    <section class="chart-card">
+      <h2 class="chart-title">How many items by end of March 2027?</h2>
+      <p class="chart-desc" id="marchDesc">Items delivered within the forecast window. Delivery is the same in both prognoses — scope creep changes what's <em>left</em>, not what you ship.</p>
+      <svg class="chart" id="chartMarch" viewBox="0 0 820 340" role="img" aria-label="Histogram of items delivered by end of March 2027"></svg>
+      <div class="legend-inline">
+        <span style="color:var(--accent-85)"><i class="dash"></i> ≥ this many at 85% confidence</span>
+        <span style="color:var(--accent-95)"><i class="dash"></i> ≥ this many at 95% confidence</span>
+      </div>
+    </section>
+
+    <details class="assume">
+      <summary>Assumptions &amp; inputs</summary>
+      <div class="assume-body">
+        <div class="field">
+          <label for="in-backlog">Backlog size (items)</label>
+          <input id="in-backlog" type="number" min="1" step="1" value="62" />
+        </div>
+        <div class="field">
+          <label for="in-tp">Historical throughput / iteration</label>
+          <input id="in-tp" type="text" value="5, 4, 4, 5, 6, 4, 2, 3, 2, 5, 6" />
+          <span class="hint">comma-separated, items per 2-week iteration</span>
+        </div>
+        <div class="field">
+          <label for="in-start">Start date (Monday)</label>
+          <input id="in-start" type="date" value="2026-11-23" />
+        </div>
+        <div class="field">
+          <label for="in-target">Forecast window ends</label>
+          <input id="in-target" type="date" value="2027-03-31" />
+        </div>
+        <div class="field">
+          <label for="in-itlen">Iteration length (days)</label>
+          <input id="in-itlen" type="number" min="1" step="1" value="14" />
+        </div>
+        <div class="field">
+          <label for="in-creepmin">Scope creep min (%)</label>
+          <input id="in-creepmin" type="number" min="0" step="1" value="20" />
+        </div>
+        <div class="field">
+          <label for="in-creepmax">Scope creep max (%)</label>
+          <input id="in-creepmax" type="number" min="0" step="1" value="30" />
+        </div>
+        <div class="field">
+          <label for="in-trials">Trials</label>
+          <input id="in-trials" type="number" min="1000" step="1000" value="20000" />
+        </div>
+        <div class="assume-actions">
+          <button class="run-btn" id="runBtn" type="button">Run simulation</button>
+          <button class="reset-btn" id="resetBtn" type="button">Reset to defaults</button>
+          <span class="err" id="errMsg"></span>
+        </div>
+      </div>
+    </details>
+
+    <details class="tbl">
+      <summary>Show results as a table</summary>
+      <div id="tableWrap"></div>
+    </details>
+
+    <footer class="note" id="methodNote"></footer>
   </div>
 
-  <section class="kpis" id="kpis"></section>
+  <!-- ===================== TAB 2: EPIC FORECAST (new) ===================== -->
+  <div id="panel-epic" class="panel" role="tabpanel" hidden>
+    <p class="sub" style="margin-top:14px">Forecasts when <b>6 Epics</b>, worked in order, will all be done — with focus factor, learning effect, seasonal uplift and holiday capacity. <span id="e-trials-sub"></span></p>
 
-  <section class="chart-card">
-    <h2 class="chart-title">When will all items be done?</h2>
-    <p class="chart-desc">Distribution of the iteration (and date) on which the backlog is cleared, across all trials.</p>
-    <svg class="chart" id="chartFinish" viewBox="0 0 820 340" role="img" aria-label="Histogram of completion dates"></svg>
-    <div class="legend-inline">
-      <span style="color:var(--accent-85)"><i class="dash"></i> 85% probability</span>
-      <span style="color:var(--accent-95)"><i class="dash"></i> 95% probability</span>
-      <span style="color:var(--text-2)"><i class="dash"></i> 50% (median)</span>
+    <div class="warns" id="e-warns"></div>
+
+    <div class="explain-actions">
+      <button class="mini-btn" id="e-explainResults" type="button">💬 Explain my results</button>
+      <button class="mini-btn" id="e-showRun" type="button">🎬 Show me one simulated run</button>
+      <button class="mini-btn" id="e-method" type="button">📘 Methodology &amp; glossary</button>
     </div>
-  </section>
 
-  <section class="chart-card">
-    <h2 class="chart-title">Probability of being finished over time</h2>
-    <p class="chart-desc">Cumulative chance the whole backlog is complete by the end of each iteration.</p>
-    <svg class="chart" id="chartCdf" viewBox="0 0 820 340" role="img" aria-label="Cumulative completion probability curve"></svg>
-  </section>
+    <section class="kpis" id="e-kpis"></section>
 
-  <section class="chart-card">
-    <h2 class="chart-title">How many items by end of March 2027?</h2>
-    <p class="chart-desc" id="marchDesc">Items delivered within the forecast window. Delivery is the same in both prognoses — scope creep changes what's <em>left</em>, not what you ship.</p>
-    <svg class="chart" id="chartMarch" viewBox="0 0 820 340" role="img" aria-label="Histogram of items delivered by end of March 2027"></svg>
-    <div class="legend-inline">
-      <span style="color:var(--accent-85)"><i class="dash"></i> ≥ this many at 85% confidence</span>
-      <span style="color:var(--accent-95)"><i class="dash"></i> ≥ this many at 95% confidence</span>
+    <!-- Per-Epic probabilities -->
+    <section class="chart-card">
+      <div class="chart-head">
+        <div><h2 class="chart-title">Per-Epic completion</h2>
+        <p class="chart-desc">Chance each Epic is done by the target date, and its P50 / P85 finish dates.</p></div>
+        <button class="qbtn" data-explain="perEpic" title="Explain">?</button>
+      </div>
+      <div id="e-epicTable"></div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-head">
+        <div><h2 class="chart-title">Historical throughput</h2>
+        <p class="chart-desc">Stories finished per 2-week sprint. Untick a bar to exclude it from the bootstrap. Greyed = excluded.</p></div>
+        <button class="qbtn" data-explain="throughput" title="Explain">?</button>
+      </div>
+      <svg class="chart" id="e-chartHist" viewBox="0 0 820 300" role="img" aria-label="Historical throughput bars"></svg>
+      <div class="legend-inline">
+        <span style="color:var(--series-a)"><i class="dash"></i> mean</span>
+        <span style="color:var(--text-2)"><i class="dash"></i> median</span>
+        <span style="color:var(--muted)"><i class="sq" style="background:var(--grid)"></i> excluded</span>
+      </div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-head">
+        <div><h2 class="chart-title">When will all 6 Epics be done?</h2>
+        <p class="chart-desc">Distribution of the sprint (and date) on which the whole scope finishes. Target date marked.</p></div>
+        <button class="qbtn" data-explain="finishHist" title="Explain">?</button>
+      </div>
+      <svg class="chart" id="e-chartFinish" viewBox="0 0 820 340" role="img" aria-label="Histogram of all-done dates"></svg>
+      <div class="legend-inline">
+        <span style="color:var(--accent-85)"><i class="dash"></i> 85%</span>
+        <span style="color:var(--accent-95)"><i class="dash"></i> 95%</span>
+        <span style="color:var(--text-2)"><i class="dash"></i> 50%</span>
+        <span style="color:var(--good)"><i class="dash"></i> target</span>
+      </div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-head">
+        <div><h2 class="chart-title">Probability of finishing over time (S-curve)</h2>
+        <p class="chart-desc">Cumulative chance everything is done by each date. Pick a confidence level to read off the date.</p></div>
+        <button class="qbtn" data-explain="scurve" title="Explain">?</button>
+      </div>
+      <svg class="chart" id="e-chartCdf" viewBox="0 0 820 340" role="img" aria-label="S-curve of completion probability"></svg>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-head">
+        <div><h2 class="chart-title">Burn-up forecast fan</h2>
+        <p class="chart-desc">Median and P15–P85 band of cumulative stories delivered, against the total-scope band (min–max of all Epic sizes).</p></div>
+        <button class="qbtn" data-explain="burnup" title="Explain">?</button>
+      </div>
+      <svg class="chart" id="e-chartBurn" viewBox="0 0 820 340" role="img" aria-label="Burn-up forecast fan"></svg>
+      <div class="legend-inline">
+        <span style="color:var(--series-a)"><i class="dash"></i> median delivered</span>
+        <span style="color:var(--series-a)"><i class="sq" style="background:var(--band)"></i> P15–P85 band</span>
+        <span style="color:var(--muted)"><i class="dash"></i> scope band (min–max)</span>
+      </div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-head">
+        <div><h2 class="chart-title">Per-Epic timeline</h2>
+        <p class="chart-desc">P50 finish (bar) with P15–P85 whiskers for each Epic, in delivery order.</p></div>
+        <button class="qbtn" data-explain="gantt" title="Explain">?</button>
+      </div>
+      <svg class="chart" id="e-chartGantt" viewBox="0 0 820 300" role="img" aria-label="Per-Epic completion timeline"></svg>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-head">
+        <div><h2 class="chart-title">Scenario comparison</h2>
+        <p class="chart-desc">Current settings vs a baseline. Default baseline removes the seasonal uplift, so you can see its effect.</p></div>
+        <button class="qbtn" data-explain="compare" title="Explain">?</button>
+      </div>
+      <div class="scenario-bar">
+        <button class="mini-btn" id="e-setBaseline" type="button">Set current as baseline</button>
+        <button class="mini-btn" id="e-resetBaseline" type="button">Use “no seasonal uplift” baseline</button>
+        <span class="hint" id="e-baselineLabel" style="color:var(--muted);font-size:0.82rem"></span>
+      </div>
+      <svg class="chart" id="e-chartCompare" viewBox="0 0 820 320" role="img" aria-label="Scenario comparison S-curves"></svg>
+      <div class="legend-inline">
+        <span style="color:var(--series-a)"><i class="dash"></i> current</span>
+        <span style="color:var(--series-b)"><i class="dash"></i> baseline</span>
+        <span style="color:var(--good)"><i class="dash"></i> target</span>
+      </div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-head">
+        <div><h2 class="chart-title">Sensitivity (tornado)</h2>
+        <p class="chart-desc">How much the P85 finish date moves if each assumption is turned down / up. Longer bar = bigger lever.</p></div>
+        <button class="qbtn" data-explain="sensitivity" title="Explain">?</button>
+      </div>
+      <svg class="chart" id="e-chartTornado" viewBox="0 0 820 260" role="img" aria-label="Sensitivity tornado chart"></svg>
+      <p class="chart-desc" id="e-tornadoNote" style="margin-top:8px"></p>
+    </section>
+
+    <!-- ========== CONTROLS ========== -->
+    <details class="assume" id="e-controls">
+      <summary>Assumptions &amp; inputs <span class="qbtn" data-explain="focus" style="margin-left:auto" title="About the focus factor">?</span></summary>
+      <div class="assume-body">
+
+        <div class="ctl-section">
+          <h4>Dates &amp; sprint</h4>
+        </div>
+        <div class="field"><label for="e-start">Start date</label><input id="e-start" type="date" value="2026-12-01" /></div>
+        <div class="field"><label for="e-target">Target date</label><input id="e-target" type="date" value="2027-05-31" /></div>
+        <div class="field"><label for="e-sprintlen">Sprint length (days)</label><input id="e-sprintlen" type="number" min="1" step="1" value="14" /></div>
+
+        <div class="ctl-section"><h4>Throughput adjustments</h4></div>
+        <div class="field">
+          <label for="e-focus">Focus factor: <b><span id="e-focusVal">75</span>%</b></label>
+          <input id="e-focus" type="range" min="0" max="150" step="5" value="75" />
+          <span class="hint">effective throughput = sampled × this</span>
+        </div>
+        <div class="focus-note">
+          <label style="font-weight:600;display:flex;gap:8px;align-items:center;cursor:pointer">
+            <input id="e-focusConfirm" type="checkbox" style="width:auto" />
+            History already reflects partial focus → use 100%
+          </label>
+          Confirm with your team whether the historical throughput was measured while the team was <em>fully</em> focused on comparable work. If it already includes split focus, set the focus factor to 100% to avoid double-counting.
+        </div>
+
+        <div class="ctl-section"><h4>Epics (worked in this order — drag not needed, use ↑ ↓)</h4></div>
+        <div class="field wide"><div id="e-epicEditor"></div>
+          <div style="margin-top:8px"><button class="mini-btn" id="e-addEpic" type="button">+ Add Epic</button></div>
+          <span class="hint">Familiarity multiplier scales work done on that Epic (1.0 = normal, 1.1 = 10% faster because the team knows it).</span>
+        </div>
+
+        <div class="ctl-section"><h4>Seasonal / time-based multipliers</h4></div>
+        <div class="field wide"><div id="e-multEditor"></div>
+          <div style="margin-top:8px"><button class="mini-btn" id="e-addMult" type="button">+ Add multiplier</button></div>
+          <span class="hint">From a given date onward, multiply throughput (e.g. uplift after the winter break).</span>
+        </div>
+
+        <div class="ctl-section"><h4>Per-sprint capacity overrides</h4></div>
+        <div class="field wide"><div id="e-ovEditor"></div>
+          <div style="margin-top:8px"><button class="mini-btn" id="e-addOv" type="button">+ Add override</button></div>
+          <span class="hint">Set a specific sprint’s capacity (e.g. 50% over Christmas / New Year). Sprint 0 = first sprint.</span>
+        </div>
+
+        <div class="ctl-section"><h4>History (bootstrap source)</h4></div>
+        <div class="field wide"><div id="e-histEditor"></div>
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="mini-btn" id="e-addHist" type="button">+ Add value</button>
+            <span class="hint">Use last <input id="e-lastN" type="number" min="1" style="width:56px;display:inline-block" /> sprints</span>
+            <button class="mini-btn" id="e-applyLastN" type="button">apply</button>
+          </div>
+          <div class="hint" id="e-histStats" style="margin-top:8px"></div>
+        </div>
+
+        <div class="ctl-section"><h4>Simulation</h4></div>
+        <div class="field"><label for="e-dist">Epic size distribution</label>
+          <select id="e-dist">
+            <option value="uniform">Discrete uniform (default)</option>
+            <option value="triangular">Triangular (mode = midpoint)</option>
+            <option value="min">Fixed at min</option>
+            <option value="mid">Fixed at midpoint</option>
+            <option value="max">Fixed at max</option>
+          </select>
+        </div>
+        <div class="field"><label for="e-trials">Trials</label><input id="e-trials" type="number" min="1000" max="100000" step="1000" value="10000" /></div>
+        <div class="field"><label for="e-conf">Confidence level: <b><span id="e-confVal">85</span>%</b></label>
+          <input id="e-conf" type="range" min="50" max="99" step="1" value="85" /></div>
+        <div class="field"><label for="e-seed">Random seed</label>
+          <div style="display:flex;gap:6px"><input id="e-seed" type="number" step="1" value="12345" style="flex:1" />
+          <button class="mini-btn" id="e-randSeed" type="button" title="Randomize">🎲</button></div></div>
+        <div class="field"><label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin-top:22px">
+          <input id="e-roundDown" type="checkbox" style="width:auto" /> Round sprint capacity down to whole stories</label></div>
+
+        <div class="assume-actions">
+          <button class="run-btn" id="e-run" type="button">Run simulation</button>
+          <button class="reset-btn" id="e-reset" type="button">Reset to defaults</button>
+          <span class="err" id="e-err"></span>
+        </div>
+      </div>
+    </details>
+
+    <!-- Save / share / export -->
+    <div class="scenario-bar" style="margin-top:16px">
+      <input id="e-scenName" type="text" placeholder="Scenario name" style="min-width:160px" />
+      <button class="mini-btn" id="e-saveScen" type="button">Save scenario</button>
+      <select id="e-loadScen"><option value="">Load scenario…</option></select>
+      <button class="mini-btn" id="e-delScen" type="button">Delete</button>
+      <button class="mini-btn" id="e-exportJson" type="button">Export JSON</button>
+      <button class="mini-btn" id="e-importJson" type="button">Import JSON</button>
+      <button class="mini-btn" id="e-share" type="button">Copy share link</button>
+      <button class="mini-btn" id="e-csv" type="button">Export CSV</button>
+      <button class="mini-btn" id="e-print" type="button">Print</button>
+      <input id="e-importFile" type="file" accept="application/json" style="display:none" />
     </div>
-  </section>
 
-  <details class="assume">
-    <summary>Assumptions &amp; inputs</summary>
-    <div class="assume-body">
-      <div class="field">
-        <label for="in-backlog">Backlog size (items)</label>
-        <input id="in-backlog" type="number" min="1" step="1" value="62" />
-      </div>
-      <div class="field">
-        <label for="in-tp">Historical throughput / iteration</label>
-        <input id="in-tp" type="text" value="5, 4, 4, 5, 6, 4, 2, 3, 2, 5, 6" />
-        <span class="hint">comma-separated, items per 2-week iteration</span>
-      </div>
-      <div class="field">
-        <label for="in-start">Start date (Monday)</label>
-        <input id="in-start" type="date" value="2026-11-23" />
-      </div>
-      <div class="field">
-        <label for="in-target">Forecast window ends</label>
-        <input id="in-target" type="date" value="2027-03-31" />
-      </div>
-      <div class="field">
-        <label for="in-itlen">Iteration length (days)</label>
-        <input id="in-itlen" type="number" min="1" step="1" value="14" />
-      </div>
-      <div class="field">
-        <label for="in-creepmin">Scope creep min (%)</label>
-        <input id="in-creepmin" type="number" min="0" step="1" value="20" />
-      </div>
-      <div class="field">
-        <label for="in-creepmax">Scope creep max (%)</label>
-        <input id="in-creepmax" type="number" min="0" step="1" value="30" />
-      </div>
-      <div class="field">
-        <label for="in-trials">Trials</label>
-        <input id="in-trials" type="number" min="1000" step="1000" value="20000" />
-      </div>
-      <div class="assume-actions">
-        <button class="run-btn" id="runBtn" type="button">Run simulation</button>
-        <button class="reset-btn" id="resetBtn" type="button">Reset to defaults</button>
-        <span class="err" id="errMsg"></span>
-      </div>
-    </div>
-  </details>
+    <details class="tbl"><summary>Show results as a table</summary><div id="e-tableWrap"></div></details>
 
-  <details class="tbl">
-    <summary>Show results as a table</summary>
-    <div id="tableWrap"></div>
-  </details>
-
-  <footer class="note" id="methodNote"></footer>
+    <footer class="note" id="e-methodNote"></footer>
+  </div>
 </div>
 
 <div id="tip" role="status" aria-live="polite"></div>
+<div id="scrim"></div>
+<aside id="drawer" role="dialog" aria-modal="false" aria-labelledby="drawerTitle">
+  <div class="d-head"><h3 id="drawerTitle">Explanation</h3><button class="close" id="drawerClose" aria-label="Close">×</button></div>
+  <div class="d-body" id="drawerBody"></div>
+</aside>
 
+<!-- ===================== SHARED: tabs + theme bridge ===================== -->
+<script>
+(function(){
+  "use strict";
+  var tabs = document.querySelectorAll('.tabs button');
+  tabs.forEach(function(b){
+    b.addEventListener('click', function(){
+      tabs.forEach(function(x){ x.setAttribute('aria-selected', x===b ? 'true':'false'); });
+      document.getElementById('panel-backlog').hidden = (b.dataset.tab!=='backlog');
+      document.getElementById('panel-epic').hidden = (b.dataset.tab!=='epic');
+      try{ localStorage.setItem('mc-tab', b.dataset.tab); }catch(e){}
+    });
+  });
+  // restore last tab, or honour a share link that targets the epic tab
+  try{
+    var want = (location.hash.indexOf('e=')>-1) ? 'epic' : (localStorage.getItem('mc-tab')||'backlog');
+    var btn = document.querySelector('.tabs button[data-tab="'+want+'"]');
+    if(btn) btn.click();
+  }catch(e){}
+})();
+</script>
+
+<!-- ===================== TAB 1 SCRIPT: BACKLOG (existing engine) ===================== -->
 <script>
 (function () {
   "use strict";
@@ -391,29 +717,24 @@
     var scope = scopeInfo(res, isCreep);
     var seriesVar = isCreep ? "var(--series-b)" : "var(--series-a)";
 
-    // toggle buttons
-    document.querySelectorAll(".seg button").forEach(function(b){
+    document.querySelectorAll("#panel-backlog .seg button").forEach(function(b){
       b.setAttribute("aria-pressed", b.dataset.k===scenario ? "true":"false");
     });
     document.getElementById("runBtn").style.background = seriesVar;
 
-    // scenario note
     var note = document.getElementById("scenarioNote");
     if(isCreep){
-      note.innerHTML = "Target grows to <b>"+scope.lo+"–"+scope.hi+" items</b> (62 + 20–30% added mid-flight). Each trial draws its own creep level.";
+      note.innerHTML = "Target grows to <b>"+scope.lo+"–"+scope.hi+" items</b> ("+cfg.backlog+" + 20–30% added mid-flight). Each trial draws its own creep level.";
     } else {
       note.innerHTML = "Fixed target of <b>"+cfg.backlog+" items</b>. No new work added during delivery.";
     }
 
-    // window line
     var winEndDate = addDays(cfg.startMs, cfg.windowIters*cfg.itlen);
     document.getElementById("marchDesc").innerHTML =
       "Forecast window = <b>"+cfg.windowIters+" iterations</b> (ends "+fmtDate(winEndDate)+"). " +
       "Delivery is the same in both prognoses — scope creep changes what's <em>left</em>, not what you ship.";
 
-    // ---- KPI cards ----
     var pctDone85 = Math.round(100*st.del85/scope.mid);
-    var remaining50 = Math.max(0, scope.mid - st.del50);
     var kpis = [
       { tag:"tag-85", tagTxt:"85% probability", label:"Finish everything by", value:fmtDate(st.date85), sub:"iteration "+st.it85+" · "+st.it85*cfg.itlen+" days from start" },
       { tag:"tag-95", tagTxt:"95% probability", label:"Finish everything by", value:fmtDate(st.date95), sub:"iteration "+st.it95+" · conservative plan" },
@@ -430,7 +751,6 @@
 
     document.getElementById("trials-sub").textContent = cfg.trials.toLocaleString("en-GB");
 
-    // ---- charts ----
     drawFinishHist(res, st, seriesVar);
     drawCdf(res, st, seriesVar);
     drawMarchHist(res, st, seriesVar, scope, isCreep);
@@ -448,7 +768,6 @@
   }
   function clear(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
 
-  // draw vertical percentile markers; merge ones on the same bucket, stack close labels
   function drawMarkers(svg, m, ph, bw, lo, hi, marks){
     var groups = {};
     marks.forEach(function(mk){
@@ -460,11 +779,10 @@
     var placed = [];
     Object.keys(groups).map(Number).sort(function(a,b){return a-b;}).forEach(function(val){
       var grp = groups[val].sort(function(a,b){return a.rank-b.rank;});
-      var top = grp[grp.length-1]; // most conservative colour/line
+      var top = grp[grp.length-1];
       var cx = m.l + (val-lo+0.5)*bw;
       svg.appendChild(el("line",{x1:cx,y1:m.t-4,x2:cx,y2:m.t+ph,stroke:top.color,"stroke-width":2,"stroke-dasharray":"5 4"}));
       var label = grp.map(function(g){return g.label;}).join(" / ");
-      // avoid horizontal label collisions by nudging y up for close neighbours
       var y = m.t-8;
       placed.forEach(function(p){ if(Math.abs(p.cx-cx) < 70 && p.y<=y) y = p.y-15; });
       svg.appendChild(el("text",{x:cx,y:y,"text-anchor":"middle",fill:top.color,"font-size":11,"font-weight":700}, label));
@@ -472,14 +790,11 @@
     });
   }
 
-  // histogram of completion iteration (x = date/iteration)
   function drawFinishHist(res, st, seriesVar){
     var svg = document.getElementById("chartFinish");
     clear(svg);
     var W=820, H=340, m={t:24,r:16,b:58,l:46};
     var pw=W-m.l-m.r, ph=H-m.t-m.b;
-
-    // bucket by iteration count, trim to [min, p99.5]
     var lo = res.sortedIters[0];
     var hi = pctAtMost(res.sortedIters, 0.995);
     if(hi<=lo) hi=lo+1;
@@ -491,8 +806,6 @@
     }
     var maxC = Math.max.apply(null, counts);
     var bw = pw/nb;
-
-    // y gridlines
     var ticks=4;
     for(var g=0; g<=ticks; g++){
       var yy = m.t + ph - (ph*g/ticks);
@@ -500,8 +813,6 @@
       svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11}, Math.round(maxC*g/ticks/res.trials*100)+"%"));
     }
     svg.appendChild(el("text",{x:14,y:m.t+ph/2,fill:"var(--muted)","font-size":11,transform:"rotate(-90 14 "+(m.t+ph/2)+")","text-anchor":"middle"},"share of trials"));
-
-    // bars
     for(var b=0;b<nb;b++){
       var itNum = lo+b;
       var h = maxC? (counts[b]/maxC)*ph : 0;
@@ -513,27 +824,20 @@
       r.addEventListener("mousemove", tipHandler("<b>Iteration "+itNum+"</b> — by "+fmtDate(dt)+"<br>"+counts[b].toLocaleString("en-GB")+" trials ("+pct.toFixed(1)+"%)"+(itNum>=hi&&hi<res.sortedIters[res.sortedIters.length-1]?" +later":"")));
       r.addEventListener("mouseleave", tipHide);
       svg.appendChild(r);
-
-      // sparse x labels (date)
       if(b===0 || b===nb-1 || b%Math.ceil(nb/6)===0){
         svg.appendChild(el("text",{x:x+bw/2,y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10}, fmtDateShort(dt)));
         svg.appendChild(el("text",{x:x+bw/2,y:m.t+ph+30,"text-anchor":"middle",fill:"var(--muted)","font-size":9}, "it "+itNum));
       }
     }
-    // baseline
     svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
-
-    // percentile markers (merge coincident ones so labels don't overprint)
     drawMarkers(svg, m, ph, bw, lo, hi, [
       {val:st.it50, color:"var(--text-2)", label:"50%", rank:0},
       {val:st.it85, color:"var(--accent-85)", label:"85%", rank:1},
       {val:st.it95, color:"var(--accent-95)", label:"95%", rank:2}
     ]);
-
     svg.appendChild(el("text",{x:m.l+pw/2,y:H-6,"text-anchor":"middle",fill:"var(--muted)","font-size":11},"completion date (end of iteration)"));
   }
 
-  // CDF line
   function drawCdf(res, st, seriesVar){
     var svg = document.getElementById("chartCdf");
     clear(svg);
@@ -542,8 +846,7 @@
     var lo = 1;
     var hi = pctAtMost(res.sortedIters,0.995);
     var cum = [];
-    var c=0, idx=0;
-    // probability done by iteration k
+    var idx=0;
     var sorted = res.sortedIters;
     for(var k=lo;k<=hi;k++){
       while(idx<sorted.length && sorted[idx]<=k){ idx++; }
@@ -551,21 +854,16 @@
     }
     function X(k){ return m.l + (hi>lo ? (k-lo)/(hi-lo)*pw : 0); }
     function Y(p){ return m.t + ph - p*ph; }
-
-    // y grid 0..100%
     for(var g=0; g<=5; g++){
       var yy = m.t+ph-(ph*g/5);
       svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
       svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11}, (g*20)+"%"));
     }
-    // 85 / 95 guide lines
     [[0.85,"var(--accent-85)","85%"],[0.95,"var(--accent-95)","95%"]].forEach(function(gg){
       var yy=Y(gg[0]);
       svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:gg[1],"stroke-width":1.5,"stroke-dasharray":"5 4",opacity:0.9}));
       svg.appendChild(el("text",{x:m.l+pw-2,y:yy-4,"text-anchor":"end",fill:gg[1],"font-size":10,"font-weight":700}, gg[2]));
     });
-
-    // area + line
     var dLine = "", dArea = "M "+X(lo)+" "+Y(0);
     cum.forEach(function(pt,i){
       var cmd=(i===0?"M":"L")+" "+X(pt.k)+" "+Y(pt.p);
@@ -575,8 +873,6 @@
     dArea += " L "+X(hi)+" "+Y(0)+" Z";
     svg.appendChild(el("path",{d:dArea, fill:seriesVar, opacity:0.12}));
     svg.appendChild(el("path",{d:dLine, fill:"none", stroke:seriesVar, "stroke-width":2.5, "stroke-linejoin":"round"}));
-
-    // markers where curve crosses 85/95 -> drop to x axis
     function drop(itNum,color){
       var x=X(itNum);
       svg.appendChild(el("line",{x1:x,y1:m.t,x2:x,y2:m.t+ph,stroke:color,"stroke-width":1.5,"stroke-dasharray":"3 4",opacity:0.8}));
@@ -584,8 +880,6 @@
     }
     drop(st.it85,"var(--accent-85)");
     drop(st.it95,"var(--accent-95)");
-
-    // x axis: iteration + date labels
     svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
     var step=Math.max(1,Math.ceil((hi-lo)/7));
     for(var kk=lo; kk<=hi; kk+=step){
@@ -593,19 +887,15 @@
       svg.appendChild(el("text",{x:x,y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10}, fmtDateShort(addDays(cfg.startMs,kk*cfg.itlen))));
       svg.appendChild(el("text",{x:x,y:m.t+ph+29,"text-anchor":"middle",fill:"var(--muted)","font-size":9}, "it "+kk));
     }
-
-    // invisible hover points
     cum.forEach(function(pt){
       var hit=el("rect",{x:X(pt.k)-(pw/(hi-lo)/2||6),y:m.t,width:(pw/(hi-lo)||12),height:ph,fill:"transparent"});
       hit.addEventListener("mousemove", tipHandler("<b>By "+fmtDate(addDays(cfg.startMs,pt.k*cfg.itlen))+"</b><br>iteration "+pt.k+" — "+Math.round(pt.p*100)+"% chance all done"));
       hit.addEventListener("mouseleave", tipHide);
       svg.appendChild(hit);
     });
-
     svg.appendChild(el("text",{x:m.l+pw/2,y:H-4,"text-anchor":"middle",fill:"var(--muted)","font-size":11},"date (end of iteration)"));
   }
 
-  // histogram of items delivered by window
   function drawMarchHist(res, st, seriesVar, scope, isCreep){
     var svg=document.getElementById("chartMarch");
     clear(svg);
@@ -618,14 +908,12 @@
     for(var i=0;i<res.delivered.length;i++){ counts[res.delivered[i]-lo]++; }
     var maxC=Math.max.apply(null,counts);
     var bw=pw/nb;
-
     for(var g=0; g<=4; g++){
       var yy=m.t+ph-(ph*g/4);
       svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
       svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11}, Math.round(maxC*g/4/res.trials*100)+"%"));
     }
     svg.appendChild(el("text",{x:14,y:m.t+ph/2,fill:"var(--muted)","font-size":11,transform:"rotate(-90 14 "+(m.t+ph/2)+")","text-anchor":"middle"},"share of trials"));
-
     for(var b=0;b<nb;b++){
       var val=lo+b;
       var h=maxC?(counts[b]/maxC)*ph:0;
@@ -640,12 +928,10 @@
       }
     }
     svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
-
     drawMarkers(svg, m, ph, bw, lo, hi, [
       {val:st.del85, color:"var(--accent-85)", label:"85%: ≥"+st.del85, rank:1},
       {val:st.del95, color:"var(--accent-95)", label:"95%: ≥"+st.del95, rank:2}
     ]);
-
     svg.appendChild(el("text",{x:m.l+pw/2,y:H-6,"text-anchor":"middle",fill:"var(--muted)","font-size":11},"items delivered by "+fmtDate(addDays(cfg.startMs,cfg.windowIters*cfg.itlen))));
   }
 
@@ -682,7 +968,7 @@
   function tipHide(){ tip.style.opacity=0; }
 
   // ---------- events ----------
-  document.querySelectorAll(".seg button").forEach(function(b){
+  document.querySelectorAll("#panel-backlog .seg button").forEach(function(b){
     b.addEventListener("click", function(){ scenario=b.dataset.k; if(cfg) render(); });
   });
   document.getElementById("runBtn").addEventListener("click", runAll);
@@ -698,7 +984,7 @@
     runAll();
   });
 
-  // theme toggle
+  // theme toggle (shared button) — also re-render the epic tab via a custom event
   var themeBtn=document.getElementById("themeBtn");
   themeBtn.addEventListener("click", function(){
     var root=document.documentElement;
@@ -710,12 +996,780 @@
     root.setAttribute("data-theme", next);
     try{ localStorage.setItem("mc-theme", next); }catch(e){}
     if(cfg) render();
+    window.dispatchEvent(new Event("mc-rerender"));
   });
   try{ var saved=localStorage.getItem("mc-theme"); if(saved) document.documentElement.setAttribute("data-theme", saved); }catch(e){}
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(){ if(cfg) render(); });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(){ if(cfg) render(); window.dispatchEvent(new Event("mc-rerender")); });
 
-  // go
   runAll();
+})();
+</script>
+<!-- ===================== TAB 2 SCRIPT: EPIC FORECAST ===================== -->
+<script>
+(function(){
+  "use strict";
+  var MS_DAY = 86400000, CAP = 60;
+  var SVGNS = "http://www.w3.org/2000/svg";
+
+  // ---------- shared helpers (main thread) ----------
+  function parseDate(s){ var p=(s||"").split("-"); return Date.UTC(+p[0],+p[1]-1,+p[2]); }
+  function toISO(ms){ var d=new Date(ms); return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0"); }
+  function fmtDate(ms){ return new Date(ms).toLocaleDateString("en-GB",{timeZone:"UTC",day:"numeric",month:"short",year:"numeric"}); }
+  function fmtDateShort(ms){ return new Date(ms).toLocaleDateString("en-GB",{timeZone:"UTC",day:"numeric",month:"short"}); }
+  function pctAtMost(sorted,q){ var i=Math.ceil(q*sorted.length)-1; if(i<0)i=0; if(i>=sorted.length)i=sorted.length-1; return sorted[i]; }
+  function el(tag,attrs,text){ var e=document.createElementNS(SVGNS,tag); for(var k in attrs){ e.setAttribute(k,attrs[k]); } if(text!=null)e.textContent=text; return e; }
+  function clear(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+  function g(id){ return document.getElementById(id); }
+
+  // =====================================================================
+  //  ENGINE  (pure, no DOM) — single source of truth, used by the Web
+  //  Worker AND the main thread (for the "show one run" stepper).
+  // =====================================================================
+  var ENGINE_SRC = [
+  "function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}",
+  "function pct(s,q){var i=Math.ceil(q*s.length)-1;if(i<0)i=0;if(i>=s.length)i=s.length-1;return s[i];}",
+  // draw an Epic size according to the chosen distribution
+  "function sampleSize(ep,rng,dist){var a=ep.min,b=ep.max;if(b<a){var t=a;a=b;b=t;}",
+  "  if(dist==='min')return a;if(dist==='max')return b;if(dist==='mid')return Math.round((a+b)/2);",
+  "  if(dist==='triangular'){var c=(a+b)/2,u=rng(),f=(b>a)?(c-a)/(b-a):0,v;if(u<f)v=a+Math.sqrt(u*(b-a)*(c-a));else v=b-Math.sqrt((1-u)*(b-a)*(b-c));v=Math.round(v);if(v<a)v=a;if(v>b)v=b;return v;}",
+  "  return a+((rng()*(b-a+1))|0);}",   // discrete uniform, inclusive
+  // one full Monte Carlo trial, logging each sprint (used by oneRun)
+  "function runTrial(cfg,rng,log){",
+  "  var E=cfg.epics,nE=E.length,hist=cfg.history,nH=hist.length,len=cfg.sprintLenMs,start=cfg.startMs;",
+  "  var rem=new Float64Array(nE),total=0,sizes=[];",
+  "  for(var e=0;e<nE;e++){var sz=sampleSize(E[e],rng,cfg.dist);rem[e]=sz;sizes.push(sz);total+=sz;}",
+  "  var done=new Int32Array(nE);for(var e2=0;e2<nE;e2++)done[e2]=cfg.cap;",       // cap = "did not finish"
+  "  var cur=0,sp=0;",
+  "  for(sp=0;sp<cfg.cap&&cur<nE;sp++){",
+  "    var raw=hist[(rng()*nH)|0];",
+  "    var tm=cfg.timeArr[sp],ov=cfg.ovArr[sp];",
+  "    var capacity=raw*cfg.focus*tm*ov;",
+  "    if(cfg.roundDown)capacity=Math.floor(capacity);",
+  "    var left=capacity,applied=[];",
+  "    while(left>1e-9&&cur<nE){",
+  "      var fam=E[cur].fam;",                                                       // familiarity scales work done
+  "      var needRaw=rem[cur]/fam;",                                                 // raw capacity to finish this Epic
+  "      if(left>=needRaw-1e-9){left-=needRaw;if(log)applied.push({epic:cur,took:rem[cur],finished:true});rem[cur]=0;done[cur]=sp;cur++;}",
+  "      else{var w=left*fam;rem[cur]-=w;if(log)applied.push({epic:cur,took:w,finished:false});left=0;}",
+  "    }",
+  "    if(log){var deliv=total;for(var e3=0;e3<nE;e3++)deliv-=rem[e3];log.push({sprint:sp,raw:raw,timeMult:tm,ov:ov,capacity:capacity,applied:applied,cumDelivered:deliv,curEpic:cur});}",
+  "    else if(sp<cfg.horizon){var d2=total;for(var e4=0;e4<nE;e4++)d2-=rem[e4];cfg._burnRow[sp]=d2;}",
+  "  }",
+  "  var finishedSprint=(cur>=nE)?(sp-1):cfg.cap;",
+  "  if(!log&&cur>=nE){for(var s2=finishedSprint+1;s2<cfg.horizon;s2++)cfg._burnRow[s2]=total;}",   // after done, delivered = full scope
+  "  return{sizes:sizes,total:total,done:done,finishedSprint:finishedSprint,finished:cur>=nE};",
+  "}",
+  // run N trials, return compact percentile summaries
+  "function simulate(cfg){",
+  "  cfg.timeArr=new Float64Array(cfg.cap);cfg.ovArr=new Float64Array(cfg.cap);",
+  "  var ovMap={};for(var i=0;i<cfg.overrides.length;i++)ovMap[cfg.overrides[i].sprint]=cfg.overrides[i].factor;",
+  "  for(var s=0;s<cfg.cap;s++){var sStart=cfg.startMs+s*cfg.sprintLenMs,m=1;for(var j=0;j<cfg.timeMults.length;j++){if(cfg.timeMults[j].from<=sStart)m*=cfg.timeMults[j].mult;}cfg.timeArr[s]=m;cfg.ovArr[s]=(s in ovMap)?ovMap[s]:1;}",
+  "  var nE=cfg.epics.length,trials=cfg.trials,H=cfg.horizon;",
+  "  var doneAll=new Int32Array(trials);",
+  "  var epicDone=[];for(var e=0;e<nE;e++)epicDone.push(new Int32Array(trials));",
+  "  var burn=new Float32Array(trials*H);",
+  "  cfg._burnRow=new Float32Array(H);",
+  "  var rng=mulberry32(cfg.seed>>>0);",
+  "  var finByTarget=0,notFin=0;var epicByT=new Int32Array(nE);",
+  "  var win=cfg.windowSprints;",                                                   // finished-by-target iff finishedSprint < win
+  "  for(var t=0;t<trials;t++){",
+  "    for(var z=0;z<H;z++)cfg._burnRow[z]=0;",
+  "    var r=runTrial(cfg,rng,null);",
+  "    for(var z2=0;z2<H;z2++)burn[t*H+z2]=cfg._burnRow[z2];",
+  "    doneAll[t]=r.finished?r.finishedSprint:cfg.cap;",
+  "    if(r.finished){if(r.finishedSprint<win)finByTarget++;}else notFin++;",
+  "    for(var e5=0;e5<nE;e5++){epicDone[e5][t]=r.done[e5];if(r.done[e5]<cfg.cap&&r.done[e5]<win)epicByT[e5]++;}",
+  "  }",
+  "  var ds=Int32Array.from(doneAll).sort();",
+  "  var epics=[];for(var e6=0;e6<nE;e6++){var a=Int32Array.from(epicDone[e6]).sort();epics.push({byTargetP:epicByT[e6]/trials,p15:pct(a,0.15),p50:pct(a,0.50),p85:pct(a,0.85)});}",
+  "  var burnP=[];var col=new Float32Array(trials);",
+  "  for(var s3=0;s3<H;s3++){for(var t2=0;t2<trials;t2++)col[t2]=burn[t2*H+s3];var c2=Float32Array.from(col).sort();burnP.push({p15:pct(c2,0.15),p50:pct(c2,0.50),p85:pct(c2,0.85)});}",
+  "  var scopeLo=0,scopeHi=0;for(var e7=0;e7<nE;e7++){scopeLo+=Math.min(cfg.epics[e7].min,cfg.epics[e7].max);scopeHi+=Math.max(cfg.epics[e7].min,cfg.epics[e7].max);}",
+  "  return{trials:trials,cap:cfg.cap,horizon:H,doneSprintSorted:ds,finishByTargetP:finByTarget/trials,notFinished:notFin,epics:epics,burn:burnP,scopeLo:scopeLo,scopeHi:scopeHi};",
+  "}",
+  // deterministic single-trial trace for "show me one run"
+  "function oneRun(cfg){",
+  "  cfg.timeArr=new Float64Array(cfg.cap);cfg.ovArr=new Float64Array(cfg.cap);",
+  "  var ovMap={};for(var i=0;i<cfg.overrides.length;i++)ovMap[cfg.overrides[i].sprint]=cfg.overrides[i].factor;",
+  "  for(var s=0;s<cfg.cap;s++){var sStart=cfg.startMs+s*cfg.sprintLenMs,m=1;for(var j=0;j<cfg.timeMults.length;j++){if(cfg.timeMults[j].from<=sStart)m*=cfg.timeMults[j].mult;}cfg.timeArr[s]=m;cfg.ovArr[s]=(s in ovMap)?ovMap[s]:1;}",
+  "  var rng=mulberry32(cfg.seed>>>0);var log=[];var r=runTrial(cfg,rng,log);r.steps=log;return r;",
+  "}"
+  ].join("\n");
+
+  // Build the engine in the main thread (for oneRun) and a Worker (for simulate).
+  var ENG = (new Function(ENGINE_SRC + "\nreturn {simulate:simulate, oneRun:oneRun};"))();
+  var worker=null, jobId=0, pending={};
+  function initWorker(){
+    try{
+      var src = ENGINE_SRC + "\nonmessage=function(e){var r=simulate(e.data.cfg);postMessage({id:e.data.id,res:r});};";
+      var blob = new Blob([src], {type:"application/javascript"});
+      worker = new Worker(URL.createObjectURL(blob));
+      worker.onmessage=function(e){ var cb=pending[e.data.id]; delete pending[e.data.id]; if(cb)cb(e.data.res); };
+    }catch(err){ worker=null; } // fall back to synchronous main-thread engine
+  }
+  initWorker();
+  function runJob(cfg){
+    return new Promise(function(resolve){
+      if(worker){ var id=++jobId; pending[id]=resolve; worker.postMessage({id:id,cfg:cfg}); }
+      else { resolve(ENG.simulate(cfg)); }
+    });
+  }
+
+  // =====================================================================
+  //  DEFAULTS & STATE
+  // =====================================================================
+  function christmasSprint(startMs, lenDays){ // sprint index containing 25 Dec 2026
+    var xmas = Date.UTC(2026,11,25); var idx = Math.floor((xmas-startMs)/(lenDays*MS_DAY)); return idx>=0?idx:1;
+  }
+  function DEFAULTS(){
+    var start="2026-12-01", len=14;
+    return {
+      start:start, target:"2027-05-31", sprintLen:len,
+      focus:0.75, focusConfirm:false,
+      epics:[
+        {name:"Epic 1",min:4,max:6,fam:1.0},
+        {name:"Epic 2",min:3,max:5,fam:1.0},
+        {name:"Epic 3",min:3,max:4,fam:1.1},
+        {name:"Epic 4",min:3,max:5,fam:1.1},
+        {name:"Epic 5",min:4,max:7,fam:1.1},
+        {name:"Epic 6",min:4,max:8,fam:1.1}
+      ],
+      timeMults:[{from:"2027-03-01",mult:1.10}],
+      overrides:[{sprint:christmasSprint(parseDate(start),len),factor:0.5}],
+      history:[{v:3,inc:true},{v:4,inc:true},{v:5,inc:true},{v:4,inc:true},{v:2,inc:true},{v:7,inc:true},{v:4,inc:true},{v:5,inc:true}],
+      dist:"uniform", trials:10000, conf:0.85, seed:12345, roundDown:false
+    };
+  }
+  var S = DEFAULTS();
+  var lastRes=null, lastCfg=null, baselineRes=null, baselineLabel="No seasonal uplift", customBaseline=false;
+
+  // =====================================================================
+  //  BUILD ENGINE CFG FROM STATE  +  VALIDATION
+  // =====================================================================
+  function selectedHistory(){ return S.history.filter(function(h){return h.inc;}).map(function(h){return h.v;}); }
+  function buildCfg(over){
+    var st = over || S;
+    var startMs=parseDate(st.start), targetMs=parseDate(st.target), len=st.sprintLen;
+    var win = Math.floor((targetMs-startMs)/(len*MS_DAY));
+    var horizon = Math.min(CAP, Math.max(win+8, 20));
+    return {
+      startMs:startMs, targetMs:targetMs, sprintLenMs:len*MS_DAY, windowSprints:win,
+      focus:st.focus, epics:st.epics.map(function(e){return {name:e.name,min:+e.min,max:+e.max,fam:+e.fam};}),
+      timeMults:st.timeMults.map(function(m){return {from:parseDate(m.from),mult:+m.mult};}),
+      overrides:st.overrides.map(function(o){return {sprint:+o.sprint,factor:+o.factor};}),
+      history: (over?st.history.filter(function(h){return h.inc;}).map(function(h){return h.v;}):selectedHistory()),
+      dist:st.dist, trials:Math.max(1000,Math.min(100000,st.trials|0)), seed:st.seed|0,
+      roundDown:!!st.roundDown, cap:CAP, horizon:horizon
+    };
+  }
+  function validate(){
+    var w=[], fatal=false;
+    var startMs=parseDate(S.start), targetMs=parseDate(S.target);
+    var hist=selectedHistory();
+    if(!(S.epics.length>0)){ w.push({bad:true,t:"Add at least one Epic."}); fatal=true; }
+    if(hist.length===0 || hist.reduce(function(a,b){return a+b;},0)===0){ w.push({bad:true,t:"Select at least one non-zero history value for the bootstrap."}); fatal=true; }
+    if(isNaN(startMs)||isNaN(targetMs)||targetMs<=startMs){ w.push({bad:true,t:"Target date must be after the start date."}); fatal=true; }
+    if(!(S.sprintLen>0)){ w.push({bad:true,t:"Sprint length must be positive."}); fatal=true; }
+    S.epics.forEach(function(e,i){ if(+e.min>+e.max) w.push({bad:false,t:"<b>"+e.name+"</b>: min ("+e.min+") is greater than max ("+e.max+"). They’ll be swapped for the simulation."}); });
+    if(hist.length>0 && hist.length<5) w.push({bad:false,t:"Only "+hist.length+" history point"+(hist.length===1?"":"s")+" selected — <b>low sample size</b>, treat results with caution."});
+    S.overrides.forEach(function(o){ if(+o.factor<0) w.push({bad:false,t:"A per-sprint override is negative; it will be treated as 0."}); });
+    return {warns:w, fatal:fatal};
+  }
+
+  // =====================================================================
+  //  CONTROLS — read from DOM, render editors
+  // =====================================================================
+  function renderEpicEditor(){
+    var h='<table class="edit"><thead><tr><th>Order</th><th>Epic</th><th>Min</th><th>Max</th><th title="Familiarity multiplier">Fam.</th><th></th></tr></thead><tbody>';
+    S.epics.forEach(function(e,i){
+      h+='<tr>'+
+        '<td style="white-space:nowrap"><button class="mini-btn" data-act="up" data-i="'+i+'" '+(i===0?'disabled':'')+'>↑</button> <button class="mini-btn" data-act="down" data-i="'+i+'" '+(i===S.epics.length-1?'disabled':'')+'>↓</button></td>'+
+        '<td><input data-f="name" data-i="'+i+'" value="'+String(e.name).replace(/"/g,'&quot;')+'" /></td>'+
+        '<td><input data-f="min" data-i="'+i+'" type="number" min="0" step="1" value="'+e.min+'" style="width:64px" /></td>'+
+        '<td><input data-f="max" data-i="'+i+'" type="number" min="0" step="1" value="'+e.max+'" style="width:64px" /></td>'+
+        '<td><input data-f="fam" data-i="'+i+'" type="number" min="0" step="0.05" value="'+e.fam+'" style="width:70px" /></td>'+
+        '<td><button class="mini-btn danger" data-act="del" data-i="'+i+'">✕</button></td></tr>';
+    });
+    h+='</tbody></table>';
+    g("e-epicEditor").innerHTML=h;
+  }
+  function renderMultEditor(){
+    var h='<table class="edit"><thead><tr><th>From date</th><th>Multiplier (×)</th><th>Slider</th><th></th></tr></thead><tbody>';
+    S.timeMults.forEach(function(m,i){
+      var pctv=Math.round((m.mult-1)*100);
+      h+='<tr><td><input data-f="from" data-i="'+i+'" type="date" value="'+m.from+'" /></td>'+
+        '<td><input data-f="mult" data-i="'+i+'" type="number" min="0.1" step="0.05" value="'+m.mult+'" style="width:80px" /></td>'+
+        '<td style="min-width:150px"><input data-f="multrange" data-i="'+i+'" type="range" min="-50" max="100" step="5" value="'+pctv+'" style="width:100%" /> <span class="hint">'+(pctv>=0?'+':'')+pctv+'%</span></td>'+
+        '<td><button class="mini-btn danger" data-act="del" data-i="'+i+'">✕</button></td></tr>';
+    });
+    h+='</tbody></table>';
+    g("e-multEditor").innerHTML=h;
+  }
+  function renderOvEditor(){
+    var startMs=parseDate(S.start), len=S.sprintLen;
+    var h='<table class="edit"><thead><tr><th>Sprint #</th><th>Covers</th><th>Capacity (%)</th><th></th></tr></thead><tbody>';
+    S.overrides.forEach(function(o,i){
+      var s0=startMs+o.sprint*len*MS_DAY, s1=startMs+(o.sprint+1)*len*MS_DAY-MS_DAY;
+      h+='<tr><td><input data-f="sprint" data-i="'+i+'" type="number" min="0" step="1" value="'+o.sprint+'" style="width:70px" /></td>'+
+        '<td class="hint" style="text-align:left">'+fmtDateShort(s0)+'–'+fmtDateShort(s1)+'</td>'+
+        '<td><input data-f="factor" data-i="'+i+'" type="number" min="0" step="5" value="'+Math.round(o.factor*100)+'" style="width:74px" /></td>'+
+        '<td><button class="mini-btn danger" data-act="del" data-i="'+i+'">✕</button></td></tr>';
+    });
+    h+='</tbody></table>';
+    g("e-ovEditor").innerHTML=h;
+  }
+  function renderHistEditor(){
+    var h='<table class="edit"><thead><tr><th>Use</th><th>Sprint</th><th>Stories</th><th></th></tr></thead><tbody>';
+    S.history.forEach(function(d,i){
+      h+='<tr class="'+(d.inc?'':'row-excluded')+'"><td><input data-f="inc" data-i="'+i+'" type="checkbox" '+(d.inc?'checked':'')+' /></td>'+
+        '<td class="hint" style="text-align:left">#'+(i+1)+'</td>'+
+        '<td><input data-f="v" data-i="'+i+'" type="number" min="0" step="1" value="'+d.v+'" style="width:80px" /></td>'+
+        '<td><button class="mini-btn danger" data-act="del" data-i="'+i+'">✕</button></td></tr>';
+    });
+    h+='</tbody></table>';
+    g("e-histEditor").innerHTML=h;
+    var sel=selectedHistory();
+    if(sel.length){
+      var mean=sel.reduce(function(a,b){return a+b;},0)/sel.length;
+      var sd=Math.sqrt(sel.reduce(function(a,b){return a+(b-mean)*(b-mean);},0)/sel.length);
+      var srt=sel.slice().sort(function(a,b){return a-b;});
+      var med=srt.length%2?srt[(srt.length-1)/2]:(srt[srt.length/2-1]+srt[srt.length/2])/2;
+      g("e-histStats").innerHTML="<b>"+sel.length+" selected</b> · mean "+mean.toFixed(2)+" · median "+med+" · min "+Math.min.apply(null,sel)+" · max "+Math.max.apply(null,sel)+" · std dev "+sd.toFixed(2);
+    } else { g("e-histStats").textContent="No history selected."; }
+  }
+  function renderEditors(){ renderEpicEditor(); renderMultEditor(); renderOvEditor(); renderHistEditor();
+    g("e-focus").value=Math.round(S.focus*100); g("e-focusVal").textContent=Math.round(S.focus*100);
+    g("e-focusConfirm").checked=S.focusConfirm;
+    g("e-start").value=S.start; g("e-target").value=S.target; g("e-sprintlen").value=S.sprintLen;
+    g("e-dist").value=S.dist; g("e-trials").value=S.trials; g("e-conf").value=Math.round(S.conf*100);
+    g("e-confVal").textContent=Math.round(S.conf*100); g("e-seed").value=S.seed; g("e-roundDown").checked=S.roundDown;
+  }
+
+  // =====================================================================
+  //  RUN + RENDER
+  // =====================================================================
+  var debounceT=null, running=false, queued=false;
+  function scheduleRun(){ clearTimeout(debounceT); debounceT=setTimeout(runEpic,250); }
+  function runEpic(){
+    var v=validate(); renderWarns(v.warns);
+    // NOTE: editors are re-rendered only on structural changes (add/remove/reorder/toggle)
+    // and on reset/load — never on every keystroke, so typing never loses focus.
+    if(v.fatal){ return; }
+    if(running){ queued=true; return; }
+    running=true;
+    var cfg=buildCfg(); lastCfg=cfg;
+    runJob(cfg).then(function(res){
+      lastRes=res;
+      var p;
+      if(!customBaseline){ // default baseline = same settings, no seasonal uplift
+        var bcfg=buildCfg(); bcfg.timeMults=[]; baselineLabel="No seasonal uplift";
+        p=runJob(bcfg).then(function(b){ baselineRes=b; });
+      } else { p=Promise.resolve(); }
+      p.then(function(){
+        render();
+        running=false;
+        if(queued){ queued=false; runEpic(); }
+        computeTornado(); // async, fills tornado chart when ready
+      });
+    });
+  }
+
+  function confDate(sortedDone,q){ var sp=pctAtMost(sortedDone,q);
+    return {sp:sp, beyond:sp>=CAP, ms: lastCfg.startMs + (sp+1)*lastCfg.sprintLenMs }; }
+  function dateOrNever(o){ return o.beyond ? "beyond "+CAP+" sprints" : fmtDate(o.ms); }
+
+  function render(){
+    var res=lastRes, cfg=lastCfg;
+    g("e-trials-sub").textContent = "· "+res.trials.toLocaleString("en-GB")+" trials"+(worker?" (Web Worker)":"");
+    var confP=S.conf;
+    var P50=confDate(res.doneSprintSorted,0.50), P70=confDate(res.doneSprintSorted,0.70),
+        P85=confDate(res.doneSprintSorted,0.85), P95=confDate(res.doneSprintSorted,0.95),
+        Pc=confDate(res.doneSprintSorted,confP);
+    var prob=Math.round(res.finishByTargetP*100);
+    var probTag = prob>=85?"tag-good":(prob>=50?"tag-85":"tag-95");
+    var kpis=[
+      {tag:probTag,tagTxt:"by "+fmtDate(cfg.targetMs),label:"Chance all "+cfg.epics.length+" Epics done",value:prob+"%",sub:(res.notFinished?("· "+res.notFinished.toLocaleString("en-GB")+" trials didn’t finish within "+CAP+" sprints"):"· every trial finished")},
+      {tag:"tag-50",tagTxt:"50% · coin-flip",label:"Likely finish (median)",value:dateOrNever(P50),sub:P50.beyond?"":"sprint "+(P50.sp+1)},
+      {tag:"tag-85",tagTxt:"85% probability",label:"Finish everything by",value:dateOrNever(P85),sub:P85.beyond?"":"sprint "+(P85.sp+1)},
+      {tag:"tag-95",tagTxt:"95% probability",label:"Finish everything by",value:dateOrNever(P95),sub:P95.beyond?"":"sprint "+(P95.sp+1)},
+      {tag:"tag-70",tagTxt:Math.round(confP*100)+"% (your choice)",label:"Plan-to date",value:dateOrNever(Pc),sub:P70&&false?"":"adjust with the confidence slider"}
+    ];
+    g("e-kpis").innerHTML=kpis.map(function(k){
+      return '<div class="card"><span class="tag '+k.tag+'">'+k.tagTxt+'</span><div class="k-label">'+k.label+'</div><div class="k-value">'+k.value+'</div><div class="k-sub">'+k.sub+'</div></div>';
+    }).join("");
+
+    renderEpicTable(res,cfg);
+    drawHist(); drawFinish(res,cfg,P50,P85,P95); drawScurve(res,cfg,Pc);
+    drawBurn(res,cfg); drawGantt(res,cfg); drawCompare(res,cfg);
+    renderResultTable(res,cfg,P50,P85,P95); renderMethod(res,cfg);
+    g("e-baselineLabel").textContent = "Baseline: "+baselineLabel;
+  }
+
+  function renderEpicTable(res,cfg){
+    var h='<table><thead><tr><th>Epic</th><th>Size (stories)</th><th>Familiarity</th><th>P(by target)</th><th>P50 finish</th><th>P85 finish</th></tr></thead><tbody>';
+    res.epics.forEach(function(ep,i){
+      var e=cfg.epics[i];
+      function d(sp){ return sp>=CAP?"—":fmtDateShort(cfg.startMs+(sp+1)*cfg.sprintLenMs); }
+      var prob=Math.round(ep.byTargetP*100);
+      var col = prob>=85?"var(--good)":(prob>=50?"var(--accent-85)":"var(--accent-95)");
+      h+='<tr><td>'+e.name+'</td><td>'+Math.min(e.min,e.max)+'–'+Math.max(e.min,e.max)+'</td><td>×'+e.fam+'</td>'+
+        '<td style="color:'+col+';font-weight:700">'+prob+'%</td><td>'+d(ep.p50)+'</td><td>'+d(ep.p85)+'</td></tr>';
+    });
+    h+='</tbody></table>';
+    g("e-epicTable").innerHTML=h;
+  }
+
+  // ---- charts ----
+  function drawHist(){
+    var svg=g("e-chartHist"); clear(svg);
+    var W=820,H=300,m={t:20,r:16,b:40,l:40}, pw=W-m.l-m.r, ph=H-m.t-m.b;
+    var vals=S.history.map(function(d){return d.v;}); var n=vals.length; if(!n){return;}
+    var maxV=Math.max.apply(null,vals)||1; var bw=pw/n;
+    var sel=selectedHistory();
+    var mean=sel.length?sel.reduce(function(a,b){return a+b;},0)/sel.length:0;
+    var srt=sel.slice().sort(function(a,b){return a-b;});
+    var med=srt.length?(srt.length%2?srt[(srt.length-1)/2]:(srt[srt.length/2-1]+srt[srt.length/2])/2):0;
+    for(var gl=0;gl<=4;gl++){ var yy=m.t+ph-ph*gl/4; svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
+      svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11},Math.round(maxV*gl/4))); }
+    function Y(v){ return m.t+ph-(v/maxV)*ph; }
+    S.history.forEach(function(d,i){
+      var x=m.l+i*bw, h=(d.v/maxV)*ph, y=m.t+ph-h;
+      var r=el("rect",{class:"bar",x:x+2,y:y,width:Math.max(0,bw-4),height:h,rx:3,fill:d.inc?"var(--series-a)":"var(--grid)",stroke:d.inc?"none":"var(--axis)","stroke-dasharray":d.inc?"":"3 3"});
+      r.addEventListener("mousemove",tipHandler("<b>Sprint #"+(i+1)+"</b><br>"+d.v+" stories"+(d.inc?"":" — excluded")));
+      r.addEventListener("mouseleave",tipHide);
+      r.style.cursor="pointer"; r.addEventListener("click",function(){ S.history[i].inc=!S.history[i].inc; scheduleRun(); });
+      svg.appendChild(r);
+      svg.appendChild(el("text",{x:x+bw/2,y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10},"#"+(i+1)));
+    });
+    svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
+    if(sel.length){
+      svg.appendChild(el("line",{x1:m.l,y1:Y(mean),x2:m.l+pw,y2:Y(mean),stroke:"var(--series-a)","stroke-width":1.5,"stroke-dasharray":"6 4"}));
+      svg.appendChild(el("text",{x:m.l+pw-2,y:Y(mean)-4,"text-anchor":"end",fill:"var(--series-a)","font-size":10,"font-weight":700},"mean "+mean.toFixed(1)));
+      svg.appendChild(el("line",{x1:m.l,y1:Y(med),x2:m.l+pw,y2:Y(med),stroke:"var(--text-2)","stroke-width":1.5,"stroke-dasharray":"2 4"}));
+      svg.appendChild(el("text",{x:m.l+2,y:Y(med)-4,"text-anchor":"start",fill:"var(--text-2)","font-size":10,"font-weight":700},"median "+med));
+    }
+  }
+
+  function histogramFromSorted(sorted, lo, hi){ var nb=hi-lo+1, c=new Array(nb).fill(0);
+    for(var i=0;i<sorted.length;i++){ var v=sorted[i]; if(v>hi)v=hi; if(v<lo)v=lo; c[v-lo]++; } return c; }
+
+  function drawFinish(res,cfg,P50,P85,P95){
+    var svg=g("e-chartFinish"); clear(svg);
+    var W=820,H=340,m={t:26,r:16,b:58,l:46}, pw=W-m.l-m.r, ph=H-m.t-m.b;
+    var ds=res.doneSprintSorted;
+    var lo=ds[0], hi=pctAtMost(ds,0.99); if(hi<=lo)hi=lo+1; if(hi>=CAP)hi=Math.min(CAP,hi);
+    var counts=histogramFromSorted(ds,lo,hi); var maxC=Math.max.apply(null,counts)||1; var bw=pw/(hi-lo+1);
+    for(var gl=0;gl<=4;gl++){ var yy=m.t+ph-ph*gl/4; svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
+      svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11},Math.round(maxC*gl/4/res.trials*100)+"%")); }
+    svg.appendChild(el("text",{x:14,y:m.t+ph/2,fill:"var(--muted)","font-size":11,transform:"rotate(-90 14 "+(m.t+ph/2)+")","text-anchor":"middle"},"share of trials"));
+    for(var b=0;b<counts.length;b++){
+      var sp=lo+b, h=(counts[b]/maxC)*ph, x=m.l+b*bw, y=m.t+ph-h;
+      var dt=cfg.startMs+(sp+1)*cfg.sprintLenMs;
+      var r=el("rect",{class:"bar",x:x+1,y:y,width:Math.max(0,bw-2),height:h,rx:3,fill:"var(--series-a)"});
+      r.addEventListener("mousemove",tipHandler("<b>Sprint "+(sp+1)+"</b> — by "+fmtDate(dt)+"<br>"+counts[b].toLocaleString("en-GB")+" trials ("+(counts[b]/res.trials*100).toFixed(1)+"%)"));
+      r.addEventListener("mouseleave",tipHide); svg.appendChild(r);
+      if(b===0||b===counts.length-1||b%Math.ceil(counts.length/6)===0){
+        svg.appendChild(el("text",{x:x+bw/2,y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10},fmtDateShort(dt)));
+        svg.appendChild(el("text",{x:x+bw/2,y:m.t+ph+30,"text-anchor":"middle",fill:"var(--muted)","font-size":9},"sp "+(sp+1)));
+      }
+    }
+    svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
+    // target line
+    var winSp=cfg.windowSprints-1; // target = end of this sprint index
+    if(winSp>=lo&&winSp<=hi){ var tx=m.l+(winSp-lo+0.5)*bw;
+      svg.appendChild(el("line",{x1:tx,y1:m.t-4,x2:tx,y2:m.t+ph,stroke:"var(--good)","stroke-width":2,"stroke-dasharray":"2 3"}));
+      svg.appendChild(el("text",{x:tx,y:m.t-8,"text-anchor":"middle",fill:"var(--good)","font-size":11,"font-weight":700},"target")); }
+    // percentile markers
+    [["50%",P50.sp,"var(--text-2)",0],["85%",P85.sp,"var(--accent-85)",1],["95%",P95.sp,"var(--accent-95)",2]].forEach(function(mk){
+      if(mk[1]<lo||mk[1]>hi)return; var cx=m.l+(mk[1]-lo+0.5)*bw;
+      svg.appendChild(el("line",{x1:cx,y1:m.t-4,x2:cx,y2:m.t+ph,stroke:mk[2],"stroke-width":2,"stroke-dasharray":"5 4"}));
+      svg.appendChild(el("text",{x:cx,y:m.t-8,"text-anchor":"middle",fill:mk[2],"font-size":11,"font-weight":700},mk[0]));
+    });
+    svg.appendChild(el("text",{x:m.l+pw/2,y:H-6,"text-anchor":"middle",fill:"var(--muted)","font-size":11},"all-Epics completion date (end of sprint)"));
+  }
+
+  function drawScurve(res,cfg,Pc){
+    var svg=g("e-chartCdf"); clear(svg);
+    var W=820,H=340,m={t:20,r:16,b:48,l:46}, pw=W-m.l-m.r, ph=H-m.t-m.b;
+    var ds=res.doneSprintSorted; var lo=0, hi=pctAtMost(ds,0.99); if(hi<=lo)hi=lo+1;
+    var cum=[],idx=0;
+    for(var k=lo;k<=hi;k++){ while(idx<ds.length&&ds[idx]<=k)idx++; cum.push({k:k,p:idx/ds.length}); }
+    function X(k){ return m.l+(hi>lo?(k-lo)/(hi-lo)*pw:0); }
+    function Y(p){ return m.t+ph-p*ph; }
+    for(var gl=0;gl<=5;gl++){ var yy=m.t+ph-ph*gl/5; svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
+      svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11},(gl*20)+"%")); }
+    // chosen confidence guide line
+    var yc=Y(S.conf);
+    svg.appendChild(el("line",{x1:m.l,y1:yc,x2:m.l+pw,y2:yc,stroke:"var(--accent-70)","stroke-width":1.5,"stroke-dasharray":"5 4"}));
+    svg.appendChild(el("text",{x:m.l+pw-2,y:yc-4,"text-anchor":"end",fill:"var(--accent-70)","font-size":10,"font-weight":700},Math.round(S.conf*100)+"%"));
+    var dLine="",dArea="M "+X(lo)+" "+Y(0);
+    cum.forEach(function(pt,i){ dLine+=(i===0?"M":"L")+" "+X(pt.k)+" "+Y(pt.p)+" "; dArea+=" L "+X(pt.k)+" "+Y(pt.p); });
+    dArea+=" L "+X(hi)+" "+Y(0)+" Z";
+    svg.appendChild(el("path",{d:dArea,fill:"var(--series-a)",opacity:0.12}));
+    svg.appendChild(el("path",{d:dLine,fill:"none",stroke:"var(--series-a)","stroke-width":2.5,"stroke-linejoin":"round"}));
+    // drop from chosen confidence
+    if(!Pc.beyond && Pc.sp>=lo && Pc.sp<=hi){ var x=X(Pc.sp);
+      svg.appendChild(el("line",{x1:x,y1:m.t,x2:x,y2:m.t+ph,stroke:"var(--accent-70)","stroke-width":1.5,"stroke-dasharray":"3 4"}));
+      svg.appendChild(el("circle",{cx:x,cy:yc,r:4,fill:"var(--accent-70)",stroke:"var(--surface)","stroke-width":1.5})); }
+    // target vertical
+    var winSp=cfg.windowSprints-1; if(winSp>=lo&&winSp<=hi){ var tx=X(winSp);
+      svg.appendChild(el("line",{x1:tx,y1:m.t,x2:tx,y2:m.t+ph,stroke:"var(--good)","stroke-width":2,"stroke-dasharray":"2 3"}));
+      svg.appendChild(el("text",{x:tx,y:m.t+10,"text-anchor":"middle",fill:"var(--good)","font-size":10,"font-weight":700},"target")); }
+    svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
+    var step=Math.max(1,Math.ceil((hi-lo)/7));
+    for(var kk=lo;kk<=hi;kk+=step){ var x2=X(kk);
+      svg.appendChild(el("text",{x:x2,y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10},fmtDateShort(cfg.startMs+(kk+1)*cfg.sprintLenMs)));
+      svg.appendChild(el("text",{x:x2,y:m.t+ph+29,"text-anchor":"middle",fill:"var(--muted)","font-size":9},"sp "+(kk+1))); }
+    cum.forEach(function(pt){ var hw=(pw/(hi-lo)||12);
+      var hit=el("rect",{x:X(pt.k)-hw/2,y:m.t,width:hw,height:ph,fill:"transparent"});
+      hit.addEventListener("mousemove",tipHandler("<b>By "+fmtDate(cfg.startMs+(pt.k+1)*cfg.sprintLenMs)+"</b><br>"+Math.round(pt.p*100)+"% chance all done"));
+      hit.addEventListener("mouseleave",tipHide); svg.appendChild(hit); });
+    svg.appendChild(el("text",{x:m.l+pw/2,y:H-4,"text-anchor":"middle",fill:"var(--muted)","font-size":11},"date (end of sprint)"));
+  }
+
+  function drawBurn(res,cfg){
+    var svg=g("e-chartBurn"); clear(svg);
+    var W=820,H=340,m={t:20,r:16,b:48,l:46}, pw=W-m.l-m.r, ph=H-m.t-m.b;
+    var B=res.burn, n=B.length;
+    var maxY=Math.max(res.scopeHi, B[n-1].p85)||1; maxY=Math.ceil(maxY*1.05);
+    function X(s){ return m.l+(n>1?s/(n-1)*pw:0); }
+    function Y(v){ return m.t+ph-(v/maxY)*ph; }
+    for(var gl=0;gl<=4;gl++){ var yy=m.t+ph-ph*gl/4; svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
+      svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11},Math.round(maxY*gl/4))); }
+    // scope band (min-max total)
+    svg.appendChild(el("rect",{x:m.l,y:Y(res.scopeHi),width:pw,height:Y(res.scopeLo)-Y(res.scopeHi),fill:"var(--muted)",opacity:0.10}));
+    [["scope "+res.scopeHi,res.scopeHi],["scope "+res.scopeLo,res.scopeLo]].forEach(function(l){
+      svg.appendChild(el("line",{x1:m.l,y1:Y(l[1]),x2:m.l+pw,y2:Y(l[1]),stroke:"var(--muted)","stroke-width":1,"stroke-dasharray":"4 4"}));
+      svg.appendChild(el("text",{x:m.l+pw-2,y:Y(l[1])-3,"text-anchor":"end",fill:"var(--muted)","font-size":10},l[0]));
+    });
+    // P15-P85 band
+    var top="",bot="";
+    B.forEach(function(p,s){ top+=(s===0?"M":"L")+" "+X(s)+" "+Y(p.p85)+" "; });
+    for(var s=n-1;s>=0;s--){ bot+="L "+X(s)+" "+Y(B[s].p15)+" "; }
+    svg.appendChild(el("path",{d:top+bot+"Z",fill:"var(--series-a)",opacity:0.16}));
+    // median line
+    var med=""; B.forEach(function(p,s){ med+=(s===0?"M":"L")+" "+X(s)+" "+Y(p.p50)+" "; });
+    svg.appendChild(el("path",{d:med,fill:"none",stroke:"var(--series-a)","stroke-width":2.5}));
+    svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
+    var step=Math.max(1,Math.ceil(n/8));
+    for(var k=0;k<n;k+=step){ svg.appendChild(el("text",{x:X(k),y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10},fmtDateShort(cfg.startMs+(k+1)*cfg.sprintLenMs)));
+      svg.appendChild(el("text",{x:X(k),y:m.t+ph+29,"text-anchor":"middle",fill:"var(--muted)","font-size":9},"sp "+(k+1))); }
+    B.forEach(function(p,s){ var hw=(pw/(n-1)||12);
+      var hit=el("rect",{x:X(s)-hw/2,y:m.t,width:hw,height:ph,fill:"transparent"});
+      hit.addEventListener("mousemove",tipHandler("<b>End of sprint "+(s+1)+"</b><br>median "+Math.round(p.p50)+" · P15 "+Math.round(p.p15)+" · P85 "+Math.round(p.p85)+" stories"));
+      hit.addEventListener("mouseleave",tipHide); svg.appendChild(hit); });
+    svg.appendChild(el("text",{x:14,y:m.t+ph/2,fill:"var(--muted)","font-size":11,transform:"rotate(-90 14 "+(m.t+ph/2)+")","text-anchor":"middle"},"cumulative stories delivered"));
+  }
+
+  function drawGantt(res,cfg){
+    var svg=g("e-chartGantt"); clear(svg);
+    var nE=res.epics.length; var rowH=Math.min(34,(300-60)/nE);
+    var W=820,H=Math.max(160,60+nE*rowH),m={t:20,r:16,b:40,l:90}, pw=W-m.l-m.r, ph=H-m.t-m.b;
+    svg.setAttribute("viewBox","0 0 "+W+" "+H);
+    var maxSp=0; res.epics.forEach(function(e){ if(e.p85<CAP&&e.p85>maxSp)maxSp=e.p85; }); maxSp=Math.max(maxSp,cfg.windowSprints)+1;
+    function X(sp){ return m.l+(sp/maxSp)*pw; }
+    // grid: sprints
+    var step=Math.max(1,Math.ceil(maxSp/8));
+    for(var k=0;k<=maxSp;k+=step){ svg.appendChild(el("line",{x1:X(k),y1:m.t,x2:X(k),y2:m.t+ph,stroke:"var(--grid)","stroke-width":1}));
+      svg.appendChild(el("text",{x:X(k),y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10},fmtDateShort(cfg.startMs+(k+1)*cfg.sprintLenMs))); }
+    // target
+    var tx=X(cfg.windowSprints-1); svg.appendChild(el("line",{x1:tx,y1:m.t,x2:tx,y2:m.t+ph,stroke:"var(--good)","stroke-width":2,"stroke-dasharray":"2 3"}));
+    svg.appendChild(el("text",{x:tx,y:m.t-6,"text-anchor":"middle",fill:"var(--good)","font-size":10,"font-weight":700},"target"));
+    res.epics.forEach(function(ep,i){
+      var y=m.t+8+i*rowH, cy=y+rowH*0.3;
+      svg.appendChild(el("text",{x:m.l-8,y:cy+4,"text-anchor":"end",fill:"var(--text-2)","font-size":11},cfg.epics[i].name));
+      var x15=X(Math.min(ep.p15,maxSp)), x50=X(Math.min(ep.p50,maxSp)), x85=X(Math.min(ep.p85,maxSp));
+      // whisker P15-P85
+      svg.appendChild(el("line",{x1:x15,y1:cy,x2:x85,y2:cy,stroke:"var(--series-a)","stroke-width":2}));
+      svg.appendChild(el("line",{x1:x15,y1:cy-5,x2:x15,y2:cy+5,stroke:"var(--series-a)","stroke-width":2}));
+      svg.appendChild(el("line",{x1:x85,y1:cy-5,x2:x85,y2:cy+5,stroke:"var(--series-a)","stroke-width":2}));
+      var dot=el("circle",{cx:x50,cy:cy,r:5,fill:"var(--series-a)",stroke:"var(--surface)","stroke-width":1.5});
+      function d(sp){ return sp>=CAP?"—":fmtDateShort(cfg.startMs+(sp+1)*cfg.sprintLenMs); }
+      dot.addEventListener("mousemove",tipHandler("<b>"+cfg.epics[i].name+"</b><br>P15 "+d(ep.p15)+" · P50 "+d(ep.p50)+" · P85 "+d(ep.p85)));
+      dot.addEventListener("mouseleave",tipHide); svg.appendChild(dot);
+    });
+  }
+
+  function cdfPoints(sorted, lo, hi){ var cum=[],idx=0; for(var k=lo;k<=hi;k++){ while(idx<sorted.length&&sorted[idx]<=k)idx++; cum.push({k:k,p:idx/sorted.length}); } return cum; }
+  function drawCompare(res,cfg){
+    var svg=g("e-chartCompare"); clear(svg);
+    var W=820,H=320,m={t:20,r:16,b:48,l:46}, pw=W-m.l-m.r, ph=H-m.t-m.b;
+    var hi=Math.max(pctAtMost(res.doneSprintSorted,0.99), baselineRes?pctAtMost(baselineRes.doneSprintSorted,0.99):0); var lo=0; if(hi<=lo)hi=lo+1;
+    function X(k){ return m.l+(k-lo)/(hi-lo)*pw; } function Y(p){ return m.t+ph-p*ph; }
+    for(var gl=0;gl<=5;gl++){ var yy=m.t+ph-ph*gl/5; svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
+      svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11},(gl*20)+"%")); }
+    function line(sorted,color){ var pts=cdfPoints(sorted,lo,hi),d=""; pts.forEach(function(pt,i){ d+=(i===0?"M":"L")+" "+X(pt.k)+" "+Y(pt.p)+" "; }); svg.appendChild(el("path",{d:d,fill:"none",stroke:color,"stroke-width":2.5})); }
+    if(baselineRes) line(baselineRes.doneSprintSorted,"var(--series-b)");
+    line(res.doneSprintSorted,"var(--series-a)");
+    var tx=X(cfg.windowSprints-1); if(cfg.windowSprints-1<=hi){ svg.appendChild(el("line",{x1:tx,y1:m.t,x2:tx,y2:m.t+ph,stroke:"var(--good)","stroke-width":2,"stroke-dasharray":"2 3"}));
+      svg.appendChild(el("text",{x:tx,y:m.t+10,"text-anchor":"middle",fill:"var(--good)","font-size":10,"font-weight":700},"target")); }
+    svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
+    var step=Math.max(1,Math.ceil((hi-lo)/7));
+    for(var kk=lo;kk<=hi;kk+=step){ svg.appendChild(el("text",{x:X(kk),y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10},fmtDateShort(cfg.startMs+(kk+1)*cfg.sprintLenMs))); }
+    svg.appendChild(el("text",{x:m.l+pw/2,y:H-4,"text-anchor":"middle",fill:"var(--muted)","font-size":11},"date (end of sprint) — current (blue) vs baseline (orange)"));
+  }
+
+  // ---- sensitivity tornado (runs reduced-trial variants) ----
+  function computeTornado(){
+    var base=buildCfg(); base.trials=Math.min(base.trials,5000);
+    function variant(mut){ var c=buildCfg(); c.trials=base.trials; mut(c); return c; }
+    var factors=[
+      {name:"Focus factor", lo:variant(function(c){c.focus=S.focus*0.8;}), hi:variant(function(c){c.focus=Math.min(1.5,S.focus*1.2);})},
+      {name:"Seasonal uplift", lo:variant(function(c){c.timeMults=[];}), hi:variant(function(c){c.timeMults=c.timeMults.map(function(m){return {from:m.from,mult:m.mult*1.1};});})},
+      {name:"Epic sizes", lo:variant(function(c){c.dist="min";}), hi:variant(function(c){c.dist="max";})},
+      {name:"Familiarity", lo:variant(function(c){c.epics=c.epics.map(function(e){return {name:e.name,min:e.min,max:e.max,fam:1.0};});}), hi:variant(function(c){c.epics=c.epics.map(function(e){return {name:e.name,min:e.min,max:e.max,fam:e.fam+0.1};});})},
+      {name:"History spread", lo:variant(function(c){var mx=Math.max.apply(null,c.history);c.history=c.history.filter(function(v){return v!==mx;});}), hi:variant(function(c){var mn=Math.min.apply(null,c.history);c.history=c.history.filter(function(v){return v!==mn;});})}
+    ];
+    var centre=pctAtMost(lastRes.doneSprintSorted,0.85);
+    var jobs=[]; factors.forEach(function(f){ jobs.push(runJob(f.lo)); jobs.push(runJob(f.hi)); });
+    Promise.all(jobs).then(function(rs){
+      var rows=factors.map(function(f,i){ var loP=pctAtMost(rs[i*2].doneSprintSorted,0.85), hiP=pctAtMost(rs[i*2+1].doneSprintSorted,0.85);
+        return {name:f.name, lo:loP, hi:hiP, span:Math.abs(hiP-loP)}; });
+      rows.sort(function(a,b){return b.span-a.span;});
+      drawTornado(rows,centre);
+    });
+  }
+  function drawTornado(rows,centre){
+    var svg=g("e-chartTornado"); clear(svg);
+    var W=820,H=Math.max(160,60+rows.length*34),m={t:16,r:20,b:30,l:120}, pw=W-m.l-m.r, ph=H-m.t-m.b;
+    svg.setAttribute("viewBox","0 0 "+W+" "+H);
+    var minV=centre,maxV=centre; rows.forEach(function(r){ minV=Math.min(minV,r.lo,r.hi); maxV=Math.max(maxV,r.lo,r.hi); });
+    minV=Math.floor(minV-0.5); maxV=Math.ceil(maxV+0.5); if(maxV<=minV)maxV=minV+1;
+    function X(sp){ return m.l+(sp-minV)/(maxV-minV)*pw; }
+    var cx=X(centre);
+    svg.appendChild(el("line",{x1:cx,y1:m.t,x2:cx,y2:m.t+ph,stroke:"var(--text-2)","stroke-width":1.5,"stroke-dasharray":"4 4"}));
+    svg.appendChild(el("text",{x:cx,y:m.t+ph+22,"text-anchor":"middle",fill:"var(--text-2)","font-size":10},"current P85 (sprint "+(centre+1)+")"));
+    var rowH=ph/rows.length;
+    rows.forEach(function(r,i){
+      var y=m.t+i*rowH+rowH/2, a=X(Math.min(r.lo,r.hi)), b=X(Math.max(r.lo,r.hi));
+      svg.appendChild(el("text",{x:m.l-8,y:y+4,"text-anchor":"end",fill:"var(--text-2)","font-size":11},r.name));
+      var rect=el("rect",{x:a,y:y-9,width:Math.max(2,b-a),height:18,rx:4,fill:"var(--series-a)",opacity:0.75});
+      rect.addEventListener("mousemove",tipHandler("<b>"+r.name+"</b><br>P85 ranges sprint "+(Math.min(r.lo,r.hi)+1)+" → "+(Math.max(r.lo,r.hi)+1)+"<br>("+r.span+" sprint"+(r.span===1?"":"s")+" of swing)"));
+      rect.addEventListener("mouseleave",tipHide);
+      svg.appendChild(rect);
+    });
+    g("e-tornadoNote").innerHTML = rows.length? ("Biggest lever on the P85 date: <b>"+rows[0].name+"</b> (~"+rows[0].span+" sprint"+(rows[0].span===1?"":"s")+" of swing). Computed at "+Math.min(S.trials,5000).toLocaleString("en-GB")+" trials per variant.") : "";
+  }
+
+  // ---- results table + method ----
+  function renderResultTable(res,cfg,P50,P85,P95){
+    var rows=[
+      ["Chance all Epics by target", Math.round(res.finishByTargetP*100)+"%", fmtDate(cfg.targetMs)],
+      ["All Epics — P50 (median)", dateOrNever(P50), P50.beyond?"":"sprint "+(P50.sp+1)],
+      ["All Epics — P85", dateOrNever(P85), P85.beyond?"":"sprint "+(P85.sp+1)],
+      ["All Epics — P95", dateOrNever(P95), P95.beyond?"":"sprint "+(P95.sp+1)]
+    ];
+    res.epics.forEach(function(ep,i){ function d(sp){return sp>=CAP?"—":fmtDate(cfg.startMs+(sp+1)*cfg.sprintLenMs);}
+      rows.push([cfg.epics[i].name+" — P85", d(ep.p85), Math.round(ep.byTargetP*100)+"% by target"]); });
+    var h='<table><thead><tr><th>Metric</th><th>Result</th><th>Detail</th></tr></thead><tbody>';
+    rows.forEach(function(r){ h+='<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td></tr>'; });
+    g("e-tableWrap").innerHTML=h+'</tbody></table>';
+  }
+  function renderMethod(res,cfg){
+    var sel=selectedHistory(); var mean=sel.reduce(function(a,b){return a+b;},0)/sel.length;
+    g("e-methodNote").textContent="Method: "+res.trials.toLocaleString("en-GB")+" Monte Carlo trials"+(worker?" (run in a Web Worker)":"")+
+      ". Each sprint’s throughput is bootstrapped from "+sel.length+" selected history values ["+sel.join(", ")+"] (mean "+mean.toFixed(2)+
+      "), then multiplied by focus "+Math.round(S.focus*100)+"%, any active seasonal multiplier and the per-sprint capacity override. "+
+      "Each Epic’s size is drawn ("+S.dist+") between its min and max; familiarity scales work done; surplus capacity carries to the next Epic. "+
+      "Percentiles use the nearest-rank method. Results are deterministic for seed "+cfg.seed+", so the forecast is reproducible and shareable.";
+  }
+
+  // ---------- tooltip ----------
+  var tip=g("tip");
+  function tipHandler(html){ return function(e){ tip.innerHTML=html; tip.style.opacity=1; var x=e.clientX+14,y=e.clientY+14; if(x>window.innerWidth-250)x=e.clientX-220; tip.style.left=x+"px"; tip.style.top=y+"px"; }; }
+  function tipHide(){ tip.style.opacity=0; }
+
+  function renderWarns(warns){
+    var box=g("e-warns");
+    if(!warns.length){ box.innerHTML=""; return; }
+    box.innerHTML=warns.map(function(w){ return '<div class="warn '+(w.bad?'bad':'caution')+'"><span>'+(w.bad?'⛔':'⚠️')+'</span><span>'+w.t+'</span></div>'; }).join("");
+  }
+
+  // =====================================================================
+  //  EXPLAIN-ON-DEMAND
+  // =====================================================================
+  var EXPLAIN={
+    throughput:{title:"Historical throughput",html:"<h4>What it shows</h4><p>Stories your team finished in each past 2-week sprint. The simulation samples from these to invent plausible futures.</p><h4>How it's used</h4><p>For every sprint of every trial we pick one of these numbers <em>at random, with replacement</em> (a bootstrap). High and low sprints both get a vote.</p><h4>Reading it</h4><p>The dashed lines are the mean and median of the <em>selected</em> values. Click a bar (or untick it below) to drop an outlier — e.g. a holiday sprint.</p><h4>Watch out</h4><p>Fewer than ~5 points makes the forecast shaky. And if that history was measured at full focus, don't also apply a focus factor below 100%.</p>"},
+    perEpic:{title:"Per-Epic completion",html:"<h4>What it shows</h4><p>For each Epic, the chance it's done by the target date, plus its P50 (coin-flip) and P85 (safe-ish) finish dates.</p><h4>How it's calculated</h4><p>Epics are worked strictly in order. We record the sprint each one finishes across all trials, then take percentiles.</p><h4>Reading it</h4><p>Later Epics inherit the uncertainty of everything before them, so their ranges are wider.</p>"},
+    finishHist:{title:"When will all Epics be done?",html:"<h4>What it shows</h4><p>Across all trials, the sprint on which the <em>last</em> Epic finishes. Taller bars = more likely dates.</p><h4>Reading it</h4><p>The green line is your target. Bars to the left of it are trials that made it; to the right, trials that didn't. The 50/85/95% lines mark where that share of trials is complete.</p><h4>Watch out</h4><p>A long right tail is normal — bad luck compounds across six Epics.</p>"},
+    scurve:{title:"S-curve (probability over time)",html:"<h4>What it shows</h4><p>The cumulative chance everything is finished by each date. It always rises from 0% to 100%.</p><h4>How to use it</h4><p>Pick a confidence level (the violet line). Where it meets the curve is the date you should promise at that confidence. 85% is a common planning choice.</p><h4>Reading it</h4><p>A steep curve = a predictable finish. A shallow one = lots of uncertainty; the gap between P50 and P85 is your risk buffer.</p>"},
+    burnup:{title:"Burn-up forecast fan",html:"<h4>What it shows</h4><p>Cumulative stories delivered over time. The line is the median; the shaded band is the P15–P85 range of trials.</p><h4>The scope band</h4><p>The grey band is total scope (sum of Epic mins to sum of maxes). The forecast finishes when the delivery fan reaches the scope band.</p><h4>Reading it</h4><p>A widening fan means growing uncertainty the further out you look.</p>"},
+    gantt:{title:"Per-Epic timeline",html:"<h4>What it shows</h4><p>Each Epic's P50 finish (the dot) with a P15–P85 whisker, in delivery order.</p><h4>Reading it</h4><p>Overlap between whiskers means the order of finishing isn't guaranteed. Whiskers that cross the green target line are at-risk Epics.</p>"},
+    compare:{title:"Scenario comparison",html:"<h4>What it shows</h4><p>Two S-curves: your current settings vs a baseline. By default the baseline is your settings <em>without</em> the seasonal uplift, so the gap is the uplift's value.</p><h4>How to use it</h4><p>Set any configuration as the baseline, change an assumption, and watch the curves separate. A curve further left/steeper is better.</p>"},
+    sensitivity:{title:"Sensitivity (tornado)",html:"<h4>What it shows</h4><p>How far the P85 finish date moves when each assumption is set low vs high. The longest bar is the assumption your forecast is most sensitive to.</p><h4>How to use it</h4><p>Spend your estimation effort on the top bar — that's where getting the number right matters most.</p>"},
+    focus:{title:"Focus factor & learning effect",html:"<h4>Focus factor</h4><p>The share of time the team spends on <em>these</em> Epics. Effective throughput = sampled throughput × focus. Default 75%.</p><p><b>Important:</b> if your historical throughput was already recorded while the team was splitting focus, it <em>already</em> includes that drag — set the focus factor to 100% to avoid double-counting. Tick the confirmation box to do that.</p><h4>Familiarity multiplier</h4><p>Per-Epic speed-up/slow-down. 1.0 = normal pace; 1.1 = 10% faster because the team already knows that Epic. It scales the work completed on that Epic.</p>"}
+  };
+  var drawer=g("drawer"), scrim=g("scrim");
+  function openDrawer(title,html){ g("drawerTitle").textContent=title; g("drawerBody").innerHTML=html; drawer.classList.add("open"); scrim.classList.add("open"); }
+  function closeDrawer(){ drawer.classList.remove("open"); scrim.classList.remove("open"); }
+  g("drawerClose").addEventListener("click",closeDrawer); scrim.addEventListener("click",closeDrawer);
+  document.querySelectorAll("#panel-epic [data-explain]").forEach(function(b){
+    b.addEventListener("click",function(ev){ ev.preventDefault(); ev.stopPropagation(); var k=b.dataset.explain; if(EXPLAIN[k]) openDrawer(EXPLAIN[k].title,EXPLAIN[k].html); });
+  });
+
+  function explainResults(){
+    if(!lastRes){ return; }
+    var cfg=lastCfg, res=lastRes;
+    var prob=Math.round(res.finishByTargetP*100);
+    var P85=confDate(res.doneSprintSorted,0.85), P50=confDate(res.doneSprintSorted,0.50), Pc=confDate(res.doneSprintSorted,S.conf);
+    var riskEpic=null,worst=1; res.epics.forEach(function(ep,i){ if(ep.byTargetP<worst){worst=ep.byTargetP;riskEpic=cfg.epics[i].name;} });
+    var html="<p>With the current assumptions there is a <b>"+prob+"% chance</b> of finishing all "+cfg.epics.length+" Epics by <b>"+fmtDate(cfg.targetMs)+"</b>.</p>";
+    html+="<p>The coin-flip (P50) finish is <b>"+dateOrNever(P50)+"</b>. To plan at <b>"+Math.round(S.conf*100)+"% confidence</b> you should aim for <b>"+dateOrNever(Pc)+"</b>; a conventional 85% plan lands on <b>"+dateOrNever(P85)+"</b>.</p>";
+    if(prob>=85) html+="<p>That target looks <b>comfortable</b> — you're above an 85% chance.</p>";
+    else if(prob>=50) html+="<p>The target is <b>plausible but not safe</b> — a bit better than a coin flip. Consider trimming scope or confirming the uplift.</p>";
+    else html+="<p>The target is <b>at risk</b> — fewer than half the simulated futures make it. Expect to move the date, cut scope, or add capacity.</p>";
+    if(riskEpic) html+="<p>The Epic least likely to land by the target is <b>"+riskEpic+"</b> ("+Math.round(worst*100)+"%).</p>";
+    if(res.notFinished) html+="<p>⚠️ "+res.notFinished.toLocaleString("en-GB")+" trial(s) didn't finish within "+CAP+" sprints — a sign throughput may be too low for this scope.</p>";
+    html+="<p class='hint'>These are model outputs, not promises. See “Methodology &amp; glossary” for the assumptions and their limits.</p>";
+    openDrawer("Explain my results",html);
+  }
+
+  function showOneRun(seedOverride){
+    var cfg=buildCfg(); if(seedOverride!=null) cfg.seed=seedOverride;
+    var r=ENG.oneRun(cfg);
+    var h="<p>One simulated trial with seed <code>"+cfg.seed+"</code>. Epic sizes were drawn first, then each sprint draws a throughput and spends it on the current Epic (surplus carries over).</p>";
+    h+="<h4>Drawn Epic sizes</h4><table><thead><tr><th>Epic</th><th>Stories</th></tr></thead><tbody>";
+    r.sizes.forEach(function(sz,i){ h+="<tr><td>"+cfg.epics[i].name+"</td><td>"+sz+"</td></tr>"; });
+    h+="</tbody></table><p>Total scope this trial: <b>"+r.total+"</b> stories.</p><h4>Sprint by sprint</h4>";
+    h+="<table><thead><tr><th>Sprint</th><th>Draw</th><th>Capacity</th><th>Did</th></tr></thead><tbody>";
+    r.steps.forEach(function(s){
+      var did=s.applied.map(function(a){ return cfg.epics[a.epic].name.replace('Epic ','E')+" +"+(Math.round(a.took*10)/10)+(a.finished?" ✓":""); }).join(", ")||"—";
+      var mult=(s.timeMult!==1||s.ov!==1)?(" ×"+(Math.round(s.timeMult*100)/100)+(s.ov!==1?" ×"+(Math.round(s.ov*100)/100):"")):"";
+      h+="<tr><td>"+(s.sprint+1)+"<br><span class='hint'>"+fmtDateShort(cfg.startMs+s.sprint*cfg.sprintLenMs)+"</span></td><td>"+s.raw+mult+"</td><td>"+(Math.round(s.capacity*10)/10)+"</td><td>"+did+"</td></tr>";
+    });
+    h+="</tbody></table>";
+    h+="<p>"+(r.finished?("All Epics finished in sprint <b>"+(r.finishedSprint+1)+"</b> ("+fmtDate(cfg.startMs+(r.finishedSprint+1)*cfg.sprintLenMs)+").") : ("Did not finish within "+CAP+" sprints."))+"</p>";
+    h+="<div class='explain-actions'><button class='mini-btn' id='e-anotherRun'>Show another run</button></div>";
+    openDrawer("One simulated run",h);
+    var btn=g("e-anotherRun"); if(btn) btn.addEventListener("click",function(){ showOneRun((Math.random()*1e9)|0); });
+  }
+
+  function showMethod(){
+    var html="<h4>The model in one paragraph</h4><p>We run thousands of imaginary deliveries. Each uses your real past throughput (sampled sprint by sprint) and your Epic size ranges, applies focus/seasonal/holiday adjustments and the learning effect, and records when the work finishes. Collecting all those finish dates gives probabilities.</p>";
+    html+="<h4>Glossary</h4>";
+    [["Monte Carlo","Running many random trials and reading the distribution of outcomes, instead of a single guess."],
+     ["Throughput","Stories completed per sprint."],
+     ["Bootstrap","Sampling from your real past sprints, with replacement, to generate plausible future sprints."],
+     ["Percentile / confidence","P85 = 85% of simulated futures finish by this date. Higher = safer, later."],
+     ["S-curve","Cumulative probability of completion over time (0%→100%)."],
+     ["Focus factor","Share of capacity spent on these Epics; effective throughput = sampled × focus."],
+     ["Familiarity multiplier","Per-Epic speed-up as the team learns the domain."],
+     ["Carry-over","Capacity left after finishing an Epic mid-sprint flows to the next Epic."]
+    ].forEach(function(p){ html+="<p><b>"+p[0]+"</b> — "+p[1]+"</p>"; });
+    html+="<h4>Limitations — read before trusting a number</h4>";
+    ["The past is assumed to represent the future; a reorg, new tech or team change breaks that.",
+     "Sprints are assumed independent — no momentum or fatigue carrying between them.",
+     "No scope creep is added unless you add it (Epic sizes only vary within their min–max).",
+     "Estimates are treated as ranges, not certainties; garbage ranges in, garbage forecast out.",
+     "Focus, uplift and familiarity are human guesses — the sensitivity chart shows which ones matter most."
+    ].forEach(function(t){ html+="<p>• "+t+"</p>"; });
+    openDrawer("Methodology & glossary",html);
+  }
+
+  // =====================================================================
+  //  SCENARIOS / EXPORT / SHARE
+  // =====================================================================
+  var LS_KEY="mc-epic-scenarios";
+  function loadScenStore(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||"{}"); }catch(e){ return {}; } }
+  function refreshScenDropdown(){ var store=loadScenStore(); var sel=g("e-loadScen");
+    sel.innerHTML='<option value="">Load scenario…</option>'+Object.keys(store).map(function(k){return '<option value="'+k.replace(/"/g,'&quot;')+'">'+k+'</option>';}).join(""); }
+  function saveScenario(){ var name=(g("e-scenName").value||"").trim(); if(!name){ g("e-err").textContent="Give the scenario a name first."; return; }
+    var store=loadScenStore(); store[name]=JSON.parse(JSON.stringify(S)); try{ localStorage.setItem(LS_KEY,JSON.stringify(store)); }catch(e){} refreshScenDropdown(); g("e-err").textContent=""; }
+  function applyState(obj){ S=Object.assign(DEFAULTS(),obj); customBaseline=false; renderEditors(); runEpic(); }
+
+  function encodeState(){ try{ return btoa(unescape(encodeURIComponent(JSON.stringify(S)))); }catch(e){ return ""; } }
+  function decodeState(str){ try{ return JSON.parse(decodeURIComponent(escape(atob(str)))); }catch(e){ return null; } }
+  function shareLink(){ var hash="#e="+encodeState(); var url=location.origin+location.pathname+hash;
+    history.replaceState(null,"",hash);
+    if(navigator.clipboard){ navigator.clipboard.writeText(url).then(function(){ g("e-err").textContent="Share link copied to clipboard."; setTimeout(function(){g("e-err").textContent="";},2500); }); }
+    else { prompt("Copy this link:",url); } }
+  function exportCSV(){
+    if(!lastRes){ return; } var cfg=lastCfg,res=lastRes;
+    var lines=["metric,result,detail"];
+    function q(s){ return '"'+String(s).replace(/"/g,'""')+'"'; }
+    lines.push(["chance_all_by_target",Math.round(res.finishByTargetP*100)+"%",toISO(cfg.targetMs)].map(q).join(","));
+    [["P50",0.50],["P70",0.70],["P85",0.85],["P95",0.95]].forEach(function(p){ var o=confDate(res.doneSprintSorted,p[1]); lines.push([("all_epics_"+p[0]),o.beyond?"not_finished":toISO(o.ms),"sprint_"+(o.sp+1)].map(q).join(",")); });
+    res.epics.forEach(function(ep,i){ function d(sp){return sp>=CAP?"not_finished":toISO(cfg.startMs+(sp+1)*cfg.sprintLenMs);}
+      lines.push([(cfg.epics[i].name+"_P50"),d(ep.p50),Math.round(ep.byTargetP*100)+"%_by_target"].map(q).join(","));
+      lines.push([(cfg.epics[i].name+"_P85"),d(ep.p85),""].map(q).join(",")); });
+    var blob=new Blob([lines.join("\n")],{type:"text/csv"}); var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download="mc2026-epic-forecast.csv"; a.click();
+  }
+
+  // =====================================================================
+  //  EVENTS
+  // =====================================================================
+  g("e-epicEditor").addEventListener("input",function(e){ var i=+e.target.dataset.i,f=e.target.dataset.f; if(f==null)return;
+    if(f==="name")S.epics[i].name=e.target.value; else S.epics[i][f]=e.target.value; scheduleRun(); });
+  g("e-epicEditor").addEventListener("click",function(e){ var b=e.target.closest("button"); if(!b)return; var i=+b.dataset.i,act=b.dataset.act;
+    if(act==="del"){ S.epics.splice(i,1); } else if(act==="up"&&i>0){ var t=S.epics[i];S.epics[i]=S.epics[i-1];S.epics[i-1]=t; }
+    else if(act==="down"&&i<S.epics.length-1){ var t2=S.epics[i];S.epics[i]=S.epics[i+1];S.epics[i+1]=t2; } else return;
+    renderEpicEditor(); scheduleRun(); });
+  g("e-addEpic").addEventListener("click",function(){ S.epics.push({name:"Epic "+(S.epics.length+1),min:3,max:5,fam:1.0}); renderEpicEditor(); scheduleRun(); });
+
+  g("e-multEditor").addEventListener("input",function(e){ var i=+e.target.dataset.i,f=e.target.dataset.f; if(f==null)return;
+    if(f==="from")S.timeMults[i].from=e.target.value;
+    else if(f==="mult")S.timeMults[i].mult=parseFloat(e.target.value)||1;
+    else if(f==="multrange"){ S.timeMults[i].mult=1+(+e.target.value)/100; renderMultEditor(); }
+    scheduleRun(); });
+  g("e-multEditor").addEventListener("click",function(e){ var b=e.target.closest("button"); if(b&&b.dataset.act==="del"){ S.timeMults.splice(+b.dataset.i,1); renderMultEditor(); scheduleRun(); } });
+  g("e-addMult").addEventListener("click",function(){ S.timeMults.push({from:S.target,mult:1.10}); renderMultEditor(); scheduleRun(); });
+
+  g("e-ovEditor").addEventListener("input",function(e){ var i=+e.target.dataset.i,f=e.target.dataset.f; if(f==null)return;
+    if(f==="sprint")S.overrides[i].sprint=parseInt(e.target.value,10)||0; else if(f==="factor")S.overrides[i].factor=(parseFloat(e.target.value)||0)/100;
+    if(f==="sprint")renderOvEditor(); scheduleRun(); });
+  g("e-ovEditor").addEventListener("click",function(e){ var b=e.target.closest("button"); if(b&&b.dataset.act==="del"){ S.overrides.splice(+b.dataset.i,1); renderOvEditor(); scheduleRun(); } });
+  g("e-addOv").addEventListener("click",function(){ S.overrides.push({sprint:0,factor:0.5}); renderOvEditor(); scheduleRun(); });
+
+  g("e-histEditor").addEventListener("input",function(e){ var i=+e.target.dataset.i,f=e.target.dataset.f; if(f==null)return;
+    if(f==="inc")S.history[i].inc=e.target.checked; else if(f==="v")S.history[i].v=parseFloat(e.target.value)||0; scheduleRun(); });
+  g("e-histEditor").addEventListener("click",function(e){ var b=e.target.closest("button"); if(b&&b.dataset.act==="del"){ S.history.splice(+b.dataset.i,1); renderHistEditor(); scheduleRun(); } });
+  g("e-addHist").addEventListener("click",function(){ S.history.push({v:4,inc:true}); renderHistEditor(); scheduleRun(); });
+  g("e-applyLastN").addEventListener("click",function(){ var n=parseInt(g("e-lastN").value,10); if(!(n>0))return;
+    S.history.forEach(function(d,i){ d.inc = i>=S.history.length-n; }); renderHistEditor(); scheduleRun(); });
+
+  g("e-focus").addEventListener("input",function(){ S.focus=(+g("e-focus").value)/100; g("e-focusVal").textContent=g("e-focus").value; S.focusConfirm=false; g("e-focusConfirm").checked=false; scheduleRun(); });
+  g("e-focusConfirm").addEventListener("change",function(){ S.focusConfirm=g("e-focusConfirm").checked; if(S.focusConfirm){ S.focus=1; g("e-focus").value=100; g("e-focusVal").textContent="100"; } scheduleRun(); });
+  g("e-conf").addEventListener("input",function(){ S.conf=(+g("e-conf").value)/100; g("e-confVal").textContent=g("e-conf").value; if(lastRes)render(); });
+  g("e-start").addEventListener("input",function(){ S.start=g("e-start").value; renderOvEditor(); scheduleRun(); });
+  g("e-target").addEventListener("input",function(){ S.target=g("e-target").value; scheduleRun(); });
+  g("e-sprintlen").addEventListener("input",function(){ S.sprintLen=parseInt(g("e-sprintlen").value,10)||14; renderOvEditor(); scheduleRun(); });
+  g("e-dist").addEventListener("change",function(){ S.dist=g("e-dist").value; scheduleRun(); });
+  g("e-trials").addEventListener("input",function(){ S.trials=parseInt(g("e-trials").value,10)||10000; scheduleRun(); });
+  g("e-seed").addEventListener("input",function(){ S.seed=parseInt(g("e-seed").value,10)||0; scheduleRun(); });
+  g("e-randSeed").addEventListener("click",function(){ S.seed=(Math.random()*1e9)|0; g("e-seed").value=S.seed; scheduleRun(); });
+  g("e-roundDown").addEventListener("change",function(){ S.roundDown=g("e-roundDown").checked; scheduleRun(); });
+  g("e-run").addEventListener("click",function(){ customBaseline=false; runEpic(); });
+  g("e-reset").addEventListener("click",function(){ S=DEFAULTS(); customBaseline=false; renderEditors(); runEpic(); });
+
+  g("e-explainResults").addEventListener("click",explainResults);
+  g("e-showRun").addEventListener("click",function(){ showOneRun(null); });
+  g("e-method").addEventListener("click",showMethod);
+
+  g("e-setBaseline").addEventListener("click",function(){ if(!lastRes)return; baselineRes=lastRes; baselineLabel="Snapshot of current"; customBaseline=true; render(); });
+  g("e-resetBaseline").addEventListener("click",function(){ customBaseline=false; runEpic(); });
+  g("e-saveScen").addEventListener("click",saveScenario);
+  g("e-loadScen").addEventListener("change",function(){ var k=g("e-loadScen").value; if(!k)return; var store=loadScenStore(); if(store[k]){ g("e-scenName").value=k; applyState(store[k]); } });
+  g("e-delScen").addEventListener("click",function(){ var k=g("e-loadScen").value; if(!k)return; var store=loadScenStore(); delete store[k]; try{ localStorage.setItem(LS_KEY,JSON.stringify(store)); }catch(e){} refreshScenDropdown(); });
+  g("e-exportJson").addEventListener("click",function(){ var blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"}); var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="mc2026-epic-scenario.json"; a.click(); });
+  g("e-importJson").addEventListener("click",function(){ g("e-importFile").click(); });
+  g("e-importFile").addEventListener("change",function(e){ var f=e.target.files[0]; if(!f)return; var rd=new FileReader(); rd.onload=function(){ try{ applyState(JSON.parse(rd.result)); }catch(err){ g("e-err").textContent="Could not read that JSON file."; } }; rd.readAsText(f); e.target.value=""; });
+  g("e-share").addEventListener("click",shareLink);
+  g("e-csv").addEventListener("click",exportCSV);
+  g("e-print").addEventListener("click",function(){ window.print(); });
+
+  window.addEventListener("mc-rerender",function(){ if(lastRes)render(); });
+
+  // =====================================================================
+  //  INIT
+  // =====================================================================
+  (function init(){
+    // restore from share link if present
+    if(location.hash.indexOf("e=")>-1){ var raw=location.hash.split("e=")[1]; var st=decodeState(raw); if(st){ S=Object.assign(DEFAULTS(),st); } }
+    refreshScenDropdown();
+    renderEditors();
+    runEpic();
+  })();
 })();
 </script>
 </body>
