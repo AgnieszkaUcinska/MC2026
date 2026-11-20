@@ -222,6 +222,9 @@
   .bar { transition: opacity .1s; }
   .bar:hover { opacity: 0.78; }
 
+  /* shared scenarios */
+  #e-sharedList table { margin-top: 4px; }
+
   /* Explain drawer */
   #drawer { position: fixed; top:0; right:0; height:100%; width: min(440px, 92vw); background: var(--surface);
     border-left: 1px solid var(--border); box-shadow: -8px 0 30px rgba(0,0,0,0.18); z-index: 60;
@@ -245,6 +248,10 @@
     .chart-card, .card { box-shadow:none; }
   }
 </style>
+<!-- Firebase (compat build) for the optional shared-scenario library. Loaded from Google's CDN.
+     If these fail to load (offline / blocked) the app still works fully; only the shared tab is disabled. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -563,6 +570,33 @@
       <button class="mini-btn" id="e-print" type="button">Print</button>
       <input id="e-importFile" type="file" accept="application/json" style="display:none" />
     </div>
+
+    <section class="chart-card" id="e-shared">
+      <div class="chart-head">
+        <div><h2 class="chart-title">Shared scenarios (team)</h2>
+        <p class="chart-desc">Publish a scenario to a cloud library your whole team can load. Protected by a shared team password — each scenario is <b>encrypted in your browser</b> before it's stored, so the database only ever holds unreadable ciphertext and the password never leaves your device.</p></div>
+        <button class="qbtn" data-explain="shared" title="Explain">?</button>
+      </div>
+      <div id="e-sharedSetup" class="warn caution" hidden><span>⚙️</span><span>Shared scenarios aren’t configured yet. Create a free Firebase project and paste its config into <code>FIREBASE_CONFIG</code> near the top of the Epic script in <code>index.html</code>. Step-by-step in the <b>README</b>.</span></div>
+      <div id="e-sharedLocked">
+        <div class="scenario-bar">
+          <input id="e-sharedPass" type="password" placeholder="Team password" autocomplete="current-password" style="min-width:190px" />
+          <button class="mini-btn" id="e-unlock" type="button">Unlock</button>
+          <label class="hint" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input id="e-sharedRemember" type="checkbox" style="width:auto" /> remember on this device</label>
+        </div>
+      </div>
+      <div id="e-sharedUnlocked" hidden>
+        <div class="scenario-bar">
+          <input id="e-sharedName" type="text" placeholder="Scenario name" style="min-width:150px" />
+          <input id="e-sharedAuthor" type="text" placeholder="Saved by (optional)" style="min-width:130px" />
+          <button class="mini-btn" id="e-publishShared" type="button">Publish current</button>
+          <button class="mini-btn" id="e-refreshShared" type="button">Refresh</button>
+          <button class="mini-btn" id="e-lock" type="button">Lock</button>
+        </div>
+        <div id="e-sharedList" style="margin-top:8px"></div>
+      </div>
+      <div class="err" id="e-sharedErr" style="margin-top:8px"></div>
+    </section>
 
     <details class="tbl"><summary>Show results as a table</summary><div id="e-tableWrap"></div></details>
 
@@ -1597,7 +1631,8 @@
     gantt:{title:"Per-Epic timeline",html:"<h4>What it shows</h4><p>Each Epic's P50 finish (the dot) with a P15–P85 whisker, in delivery order.</p><h4>Reading it</h4><p>Overlap between whiskers means the order of finishing isn't guaranteed. Whiskers that cross the green target line are at-risk Epics.</p>"},
     compare:{title:"Scenario comparison",html:"<h4>What it shows</h4><p>Two S-curves: your current settings vs a baseline. By default the baseline is your settings <em>without</em> the seasonal uplift, so the gap is the uplift's value.</p><h4>How to use it</h4><p>Set any configuration as the baseline, change an assumption, and watch the curves separate. A curve further left/steeper is better.</p>"},
     sensitivity:{title:"Sensitivity (tornado)",html:"<h4>What it shows</h4><p>How far the P85 finish date moves when each assumption is set low vs high. The longest bar is the assumption your forecast is most sensitive to.</p><h4>How to use it</h4><p>Spend your estimation effort on the top bar — that's where getting the number right matters most.</p>"},
-    focus:{title:"Focus factor & learning effect",html:"<h4>Focus factor</h4><p>The share of time the team spends on <em>these</em> Epics. Effective throughput = sampled throughput × focus. Default 75%.</p><p><b>Important:</b> if your historical throughput was already recorded while the team was splitting focus, it <em>already</em> includes that drag — set the focus factor to 100% to avoid double-counting. Tick the confirmation box to do that.</p><h4>Familiarity multiplier</h4><p>Per-Epic speed-up/slow-down. 1.0 = normal pace; 1.1 = 10% faster because the team already knows that Epic. It scales the work completed on that Epic.</p>"}
+    focus:{title:"Focus factor & learning effect",html:"<h4>Focus factor</h4><p>The share of time the team spends on <em>these</em> Epics. Effective throughput = sampled throughput × focus. Default 75%.</p><p><b>Important:</b> if your historical throughput was already recorded while the team was splitting focus, it <em>already</em> includes that drag — set the focus factor to 100% to avoid double-counting. Tick the confirmation box to do that.</p><h4>Familiarity multiplier</h4><p>Per-Epic speed-up/slow-down. 1.0 = normal pace; 1.1 = 10% faster because the team already knows that Epic. It scales the work completed on that Epic.</p>"},
+    shared:{title:"Shared scenarios",html:"<h4>What it is</h4><p>A cloud library your whole team shares, unlocked with one team password. Your private saved scenarios (the row above) stay in your browser; this is the shared one.</p><h4>How your data is protected</h4><p>When you publish, the scenario is encrypted in your browser with a key derived from the team password (PBKDF2 → AES-GCM). Only the encrypted blob is uploaded, so the database never sees your numbers, names, or the password itself. Entering the right password is what makes the library readable.</p><h4>Good to know</h4><p>Anyone with the page <em>and</em> the password can load, publish or delete scenarios. Share the password privately (never in the repo). Encryption protects what the scenarios contain — not against someone deleting them. For stronger control, add a Firebase sign-in later.</p>"}
   };
   var drawer=g("drawer"), scrim=g("scrim");
   function openDrawer(title,html){ g("drawerTitle").textContent=title; g("drawerBody").innerHTML=html; drawer.classList.add("open"); scrim.classList.add("open"); }
@@ -1695,6 +1730,109 @@
     var blob=new Blob([lines.join("\n")],{type:"text/csv"}); var a=document.createElement("a");
     a.href=URL.createObjectURL(blob); a.download="mc2026-epic-forecast.csv"; a.click();
   }
+
+  // =====================================================================
+  //  SHARED SCENARIOS  (Firebase Firestore + client-side encryption)
+  //  The team password never leaves the browser: it derives an AES-GCM key
+  //  (PBKDF2) that encrypts each scenario, so Firestore only holds ciphertext.
+  // =====================================================================
+  // >>> PASTE YOUR FIREBASE CONFIG HERE (see README). The apiKey is meant to be
+  //     public; access is controlled by the team password + Firestore rules. <<<
+  var FIREBASE_CONFIG = {
+    apiKey: "PASTE_ME",
+    authDomain: "PASTE_ME.firebaseapp.com",
+    projectId: "PASTE_ME",
+    storageBucket: "PASTE_ME.appspot.com",
+    messagingSenderId: "PASTE_ME",
+    appId: "PASTE_ME"
+  };
+  var db=null, sharedKey=null, sharedLoaded=[];
+  function fbConfigured(){ return FIREBASE_CONFIG.projectId && FIREBASE_CONFIG.projectId.indexOf("PASTE_ME")<0; }
+  function ensureFb(){
+    if(db) return db;
+    if(!window.firebase || !fbConfigured()) return null;
+    try{ if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG); db=firebase.firestore(); return db; }catch(e){ return null; }
+  }
+  function cryptoOk(){ return window.crypto && window.crypto.subtle; }
+  function sB64(buf){ var b=new Uint8Array(buf),s=""; for(var i=0;i<b.length;i++)s+=String.fromCharCode(b[i]); return btoa(s); }
+  function sUnB64(str){ var bin=atob(str),a=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return a; }
+  function deriveKey(pw){ var enc=new TextEncoder();
+    return crypto.subtle.importKey("raw",enc.encode(pw),"PBKDF2",false,["deriveKey"]).then(function(bk){
+      return crypto.subtle.deriveKey({name:"PBKDF2",salt:enc.encode("MC2026-shared-v1"),iterations:100000,hash:"SHA-256"},bk,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]); }); }
+  function encObj(key,obj){ var iv=crypto.getRandomValues(new Uint8Array(12)); var data=new TextEncoder().encode(JSON.stringify(obj));
+    return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key,data).then(function(ct){ return {iv:sB64(iv),ct:sB64(ct)}; }); }
+  function decObj(key,rec){ return crypto.subtle.decrypt({name:"AES-GCM",iv:sUnB64(rec.iv)},key,sUnB64(rec.ct)).then(function(pt){ return JSON.parse(new TextDecoder().decode(pt)); }); }
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+  function sharedErr(msg){ g("e-sharedErr").textContent=msg||""; }
+  function setLocked(locked){ g("e-sharedLocked").hidden=!locked; g("e-sharedUnlocked").hidden=locked; }
+
+  function unlockShared(pw, silent){
+    var database=ensureFb();
+    if(!database){ sharedErr("Shared library isn’t available (config missing or Firebase didn’t load)."); return; }
+    if(!cryptoOk()){ sharedErr("Encryption needs HTTPS — open the published site, not a local file."); return; }
+    if(!silent) sharedErr("Checking…");
+    deriveKey(pw).then(function(key){
+      return database.collection("_meta").doc("probe").get().then(function(doc){
+        if(doc.exists){
+          return decObj(key, doc.data()).then(function(){ sharedKey=key; afterUnlock(pw); },
+            function(){ sharedErr("That password doesn’t match the team password."); });
+        } else { // first ever unlock: set the probe so future wrong passwords are detected
+          return encObj(key,{probe:"MC2026"}).then(function(rec){ rec.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+            return database.collection("_meta").doc("probe").set(rec).then(function(){ sharedKey=key; afterUnlock(pw); }); });
+        }
+      });
+    }).catch(function(e){ sharedErr("Could not reach the shared library: "+((e&&e.message)||e)); });
+  }
+  function afterUnlock(pw){
+    sharedErr(""); setLocked(false);
+    try{ sessionStorage.setItem("mc-shared-pw",pw); if(g("e-sharedRemember").checked) localStorage.setItem("mc-shared-pw",pw); else localStorage.removeItem("mc-shared-pw"); }catch(e){}
+    listShared();
+  }
+  function lockShared(){ sharedKey=null; setLocked(true); g("e-sharedList").innerHTML=""; g("e-sharedPass").value="";
+    try{ localStorage.removeItem("mc-shared-pw"); sessionStorage.removeItem("mc-shared-pw"); }catch(e){} sharedErr(""); }
+
+  function publishShared(){
+    if(!sharedKey){ return; } var database=ensureFb(); if(!database) return;
+    var name=(g("e-sharedName").value||"").trim(); if(!name){ sharedErr("Give the scenario a name."); return; }
+    var payload={ name:name, author:(g("e-sharedAuthor").value||"").trim(), state:S, savedAt:Date.now() };
+    sharedErr("Publishing…");
+    encObj(sharedKey,payload).then(function(rec){ rec.createdAt=firebase.firestore.FieldValue.serverTimestamp(); rec.v=1;
+      return database.collection("scenarios").add(rec); })
+      .then(function(){ sharedErr("Published."); g("e-sharedName").value=""; listShared(); setTimeout(function(){sharedErr("");},2000); })
+      .catch(function(e){ sharedErr("Publish failed: "+((e&&e.message)||e)); });
+  }
+  function listShared(){
+    if(!sharedKey){ return; } var database=ensureFb(); if(!database) return;
+    g("e-sharedList").innerHTML='<span class="hint">Loading…</span>';
+    database.collection("scenarios").orderBy("createdAt","desc").get().then(function(snap){
+      var jobs=[]; snap.forEach(function(doc){ jobs.push(decObj(sharedKey,doc.data()).then(function(p){ return {id:doc.id,p:p}; }, function(){ return null; })); });
+      return Promise.all(jobs);
+    }).then(function(items){
+      sharedLoaded=items.filter(Boolean);
+      if(!sharedLoaded.length){ g("e-sharedList").innerHTML='<span class="hint">No scenarios yet for this password. Publish one above.</span>'; return; }
+      var h='<table><thead><tr><th>Scenario</th><th>Saved by</th><th>When</th><th></th></tr></thead><tbody>';
+      sharedLoaded.forEach(function(it,i){ var d=it.p.savedAt?new Date(it.p.savedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"";
+        h+='<tr><td>'+esc(it.p.name)+'</td><td>'+esc(it.p.author||"—")+'</td><td>'+d+'</td>'+
+          '<td style="white-space:nowrap"><button class="mini-btn" data-load="'+i+'">Load</button> <button class="mini-btn danger" data-del="'+esc(it.id)+'">Delete</button></td></tr>'; });
+      g("e-sharedList").innerHTML=h+'</tbody></table>';
+    }).catch(function(e){ g("e-sharedList").innerHTML='<span class="err">Could not load: '+esc((e&&e.message)||String(e))+'</span>'; });
+  }
+
+  (function initShared(){
+    if(!fbConfigured()){ g("e-sharedSetup").hidden=false; g("e-sharedLocked").hidden=true; return; }
+    g("e-unlock").addEventListener("click",function(){ var pw=g("e-sharedPass").value; if(!pw){ sharedErr("Enter the team password."); return; } unlockShared(pw,false); });
+    g("e-sharedPass").addEventListener("keydown",function(e){ if(e.key==="Enter") g("e-unlock").click(); });
+    g("e-lock").addEventListener("click",lockShared);
+    g("e-publishShared").addEventListener("click",publishShared);
+    g("e-refreshShared").addEventListener("click",listShared);
+    g("e-sharedList").addEventListener("click",function(e){ var b=e.target.closest("button"); if(!b)return;
+      if(b.dataset.load!=null){ var it=sharedLoaded[+b.dataset.load]; if(it){ applyState(it.p.state); sharedErr("Loaded “"+it.p.name+"”."); setTimeout(function(){sharedErr("");},2000); } }
+      else if(b.dataset.del){ if(confirm("Delete this shared scenario for the whole team? This cannot be undone.")){ var database=ensureFb(); if(database) database.collection("scenarios").doc(b.dataset.del).delete().then(listShared).catch(function(err){ sharedErr("Delete failed: "+((err&&err.message)||err)); }); } }
+    });
+    // auto-unlock if the password was remembered on this device / tab
+    var pw=null; try{ pw=localStorage.getItem("mc-shared-pw")||sessionStorage.getItem("mc-shared-pw"); }catch(e){}
+    if(pw){ try{ g("e-sharedRemember").checked=!!localStorage.getItem("mc-shared-pw"); }catch(e){} unlockShared(pw,true); }
+  })();
 
   // =====================================================================
   //  EVENTS

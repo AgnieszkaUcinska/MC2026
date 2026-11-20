@@ -72,6 +72,51 @@ root. There is no CI pipeline to wait on — the file *is* the site.
 
 ---
 
+## Shared scenarios (Firebase) — one-time setup
+
+The Epic tab has a **Shared scenarios (team)** panel so colleagues can publish and load scenarios
+from a shared cloud library, unlocked with one **team password**. It uses a free Firebase
+Firestore database. Until you configure it, the panel shows a "not configured" notice and the rest
+of the app works normally.
+
+**How the password protects your data:** when someone publishes, the scenario is encrypted in their
+browser with a key derived from the team password (PBKDF2 → AES-GCM). Only the encrypted blob is
+uploaded, so Firestore never sees your numbers, names, or the password. Entering the correct
+password is what makes the library readable. ⚠️ With no login, the database is *open* — the
+password protects the **contents** (confidentiality), not against someone deleting entries. That's
+fine for a trusted team; for stronger control add Firebase Authentication later.
+
+### Steps (about 5 minutes, no credit card)
+
+1. Go to **https://console.firebase.google.com** → **Add project** (accept defaults; you can skip
+   Google Analytics).
+2. In the project, click the **Web** icon (`</>`) to "Add an app". Give it a nickname, register it,
+   and copy the `firebaseConfig` object it shows you (apiKey, authDomain, projectId, …).
+3. Left menu → **Build → Firestore Database → Create database**. Choose **production mode** and a
+   region near your team.
+4. Open the **Rules** tab and paste the rules below, then **Publish**:
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /scenarios/{doc} { allow read, create, delete: if true; allow update: if false; }
+       match /_meta/{doc}     { allow read, create: if true; allow update, delete: if false; }
+     }
+   }
+   ```
+
+5. In `index.html`, search for `FIREBASE_CONFIG` (near the top of the Epic script) and replace the
+   `PASTE_ME` values with the config from step 2. Commit and push.
+6. **Share the team password privately** (chat/1Password — *not* in the repo). The first person to
+   unlock with a password sets it for everyone; after that, a wrong password is rejected.
+
+Notes: the shared panel needs **HTTPS** (the live Pages site works; opening the local file won't do
+encryption). One Firebase project = one team password. Firestore's free "Spark" tier is far more
+than a scenario library needs and the database never sleeps.
+
+---
+
 ## The model, and its limits
 
 - The past is assumed to represent the future. A reorg, new tech, or team change breaks that.
