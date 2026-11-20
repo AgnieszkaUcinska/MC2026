@@ -1,72 +1,722 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MC2026</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --bg2: #1e293b;
-      --accent: #38bdf8;
-      --text: #e2e8f0;
-      --muted: #94a3b8;
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MC2026 Forecast</title>
+<meta name="description" content="Monte Carlo delivery forecast for the MC2026 backlog." />
+<style>
+  :root {
+    color-scheme: light;
+    --plane: #f9f9f7;
+    --surface: #fcfcfb;
+    --text-1: #0b0b0b;
+    --text-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-a: #2a78d6;   /* blue  - fixed scope */
+    --series-b: #eb6834;   /* orange - scope creep */
+    --accent-85: #eda100;  /* amber */
+    --accent-95: #d03b3b;  /* red   */
+    --good: #0ca30c;
+    --shadow: 0 1px 3px rgba(11,11,11,0.06), 0 8px 24px rgba(11,11,11,0.04);
+  }
+  :root[data-theme="dark"], :root:not([data-theme="light"]) {
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane: #0d0d0d;
+      --surface: #1a1a19;
+      --text-1: #f0efec;
+      --text-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-a: #3987e5;
+      --series-b: #d95926;
+      --accent-85: #fab219;
+      --accent-95: #e66767;
+      --good: #0ca30c;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: radial-gradient(1200px 600px at 50% -10%, var(--bg2), var(--bg));
-      color: var(--text);
-      padding: 24px;
-      text-align: center;
-    }
-    .card {
-      max-width: 560px;
-    }
-    .badge {
-      display: inline-block;
-      font-size: 0.8rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--accent);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      border-radius: 999px;
-      padding: 6px 16px;
-      margin-bottom: 28px;
-    }
-    h1 {
-      font-size: clamp(3rem, 12vw, 6rem);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      line-height: 1;
-      background: linear-gradient(135deg, #fff, var(--accent));
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-    p {
-      margin-top: 20px;
-      font-size: 1.1rem;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-    footer {
-      margin-top: 40px;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-  </style>
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane: #0d0d0d;
+    --surface: #1a1a19;
+    --text-1: #f0efec;
+    --text-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-a: #3987e5;
+    --series-b: #d95926;
+    --accent-85: #fab219;
+    --accent-95: #e66767;
+    --good: #0ca30c;
+    --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--plane);
+    color: var(--text-1);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+
+  header.top { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+  h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+  .sub { color: var(--text-2); font-size: 0.95rem; margin: 4px 0 0; }
+  .theme-btn {
+    background: var(--surface); color: var(--text-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 14px; font-size: 0.85rem; cursor: pointer; font-family: inherit;
+  }
+  .theme-btn:hover { color: var(--text-1); }
+
+  /* Prognosis toggle */
+  .toggle-row { margin: 22px 0 6px; }
+  .toggle-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .seg {
+    display: inline-flex; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 4px; gap: 4px; box-shadow: var(--shadow);
+  }
+  .seg button {
+    border: 0; background: transparent; color: var(--text-2); font-family: inherit;
+    font-size: 0.92rem; font-weight: 600; padding: 9px 16px; border-radius: 9px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .seg button .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .seg button[data-k="A"] .dot { background: var(--series-a); }
+  .seg button[data-k="B"] .dot { background: var(--series-b); }
+  .seg button[aria-pressed="true"] { color: #fff; }
+  .seg button[data-k="A"][aria-pressed="true"] { background: var(--series-a); }
+  .seg button[data-k="B"][aria-pressed="true"] { background: var(--series-b); }
+  .seg button[aria-pressed="true"] .dot { background: #fff; }
+  .scenario-note { font-size: 0.9rem; color: var(--text-2); margin: 10px 2px 0; }
+
+  /* KPI cards */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 20px 0 8px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .card .k-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .card .k-value { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; margin: 6px 0 2px; line-height: 1.1; }
+  .card .k-sub { font-size: 0.86rem; color: var(--text-2); }
+  .card .tag { display:inline-block; font-size: 0.72rem; font-weight:700; padding: 2px 8px; border-radius: 999px; margin-bottom: 6px; }
+  .tag-85 { background: color-mix(in srgb, var(--accent-85) 18%, transparent); color: var(--accent-85); }
+  .tag-95 { background: color-mix(in srgb, var(--accent-95) 18%, transparent); color: var(--accent-95); }
+  .tag-50 { background: color-mix(in srgb, var(--text-2) 14%, transparent); color: var(--text-2); }
+
+  /* Charts */
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px 18px 10px; box-shadow: var(--shadow); margin-top: 18px;
+  }
+  .chart-title { font-size: 1.02rem; font-weight: 700; margin: 0 0 2px; }
+  .chart-desc { font-size: 0.86rem; color: var(--text-2); margin: 0 0 12px; }
+  svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .legend-inline { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--text-2); margin-top: 6px; }
+  .legend-inline span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-inline i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+  .legend-inline i.dash { height: 0; border-top: 2px dashed currentColor; }
+
+  /* Assumptions */
+  details.assume { margin-top: 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+  details.assume > summary { cursor: pointer; padding: 14px 18px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 8px; }
+  details.assume > summary::-webkit-details-marker { display: none; }
+  details.assume > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+  details.assume[open] > summary::before { transform: rotate(90deg); }
+  .assume-body { padding: 4px 18px 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 14px 18px; align-items: end; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; }
+  .field input {
+    font-family: inherit; font-size: 0.92rem; padding: 8px 10px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--plane); color: var(--text-1);
+  }
+  .field .hint { font-size: 0.74rem; color: var(--muted); }
+  .assume-actions { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .run-btn { background: var(--series-a); color: #fff; border: 0; border-radius: 10px; padding: 10px 20px; font-weight: 700; font-family: inherit; font-size: 0.92rem; cursor: pointer; }
+  .run-btn:hover { filter: brightness(1.05); }
+  .reset-btn { background: transparent; color: var(--text-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; font-family: inherit; cursor: pointer; }
+  .err { color: var(--accent-95); font-size: 0.85rem; }
+
+  /* Data table */
+  details.tbl { margin-top: 18px; }
+  details.tbl > summary { cursor: pointer; font-size: 0.88rem; color: var(--text-2); }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--grid); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-weight: 600; font-size: 0.8rem; }
+
+  footer.note { margin-top: 28px; font-size: 0.8rem; color: var(--muted); line-height: 1.6; }
+  footer.note code { background: color-mix(in srgb, var(--muted) 16%, transparent); padding: 1px 5px; border-radius: 4px; }
+
+  /* tooltip */
+  #tip {
+    position: fixed; pointer-events: none; z-index: 50; background: var(--text-1); color: var(--plane);
+    font-size: 0.78rem; padding: 7px 10px; border-radius: 8px; box-shadow: var(--shadow);
+    opacity: 0; transform: translateY(-4px); transition: opacity .08s; max-width: 240px;
+  }
+  #tip b { font-weight: 700; }
+  .bar { transition: opacity .1s; }
+  .bar:hover { opacity: 0.78; }
+</style>
 </head>
 <body>
-  <main class="card">
-    <span class="badge">Coming soon</span>
-    <h1>MC2026</h1>
-    <p>This site is under construction. Check back soon for updates.</p>
-    <footer>&copy; 2026 MC2026</footer>
-  </main>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>MC2026 — Delivery Forecast</h1>
+      <p class="sub">Monte Carlo simulation · <span id="trials-sub"></span> trials · bootstrap of historical throughput</p>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button">◐ Theme</button>
+  </header>
+
+  <div class="toggle-row">
+    <div class="toggle-label">Prognosis</div>
+    <div class="seg" role="group" aria-label="Choose prognosis">
+      <button type="button" data-k="A" aria-pressed="true"><span class="dot"></span>Fixed scope</button>
+      <button type="button" data-k="B" aria-pressed="false"><span class="dot"></span>+ Scope creep 20–30%</button>
+    </div>
+    <p class="scenario-note" id="scenarioNote"></p>
+  </div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="chart-card">
+    <h2 class="chart-title">When will all items be done?</h2>
+    <p class="chart-desc">Distribution of the iteration (and date) on which the backlog is cleared, across all trials.</p>
+    <svg class="chart" id="chartFinish" viewBox="0 0 820 340" role="img" aria-label="Histogram of completion dates"></svg>
+    <div class="legend-inline">
+      <span style="color:var(--accent-85)"><i class="dash"></i> 85% probability</span>
+      <span style="color:var(--accent-95)"><i class="dash"></i> 95% probability</span>
+      <span style="color:var(--text-2)"><i class="dash"></i> 50% (median)</span>
+    </div>
+  </section>
+
+  <section class="chart-card">
+    <h2 class="chart-title">Probability of being finished over time</h2>
+    <p class="chart-desc">Cumulative chance the whole backlog is complete by the end of each iteration.</p>
+    <svg class="chart" id="chartCdf" viewBox="0 0 820 340" role="img" aria-label="Cumulative completion probability curve"></svg>
+  </section>
+
+  <section class="chart-card">
+    <h2 class="chart-title">How many items by end of March 2027?</h2>
+    <p class="chart-desc" id="marchDesc">Items delivered within the forecast window. Delivery is the same in both prognoses — scope creep changes what's <em>left</em>, not what you ship.</p>
+    <svg class="chart" id="chartMarch" viewBox="0 0 820 340" role="img" aria-label="Histogram of items delivered by end of March 2027"></svg>
+    <div class="legend-inline">
+      <span style="color:var(--accent-85)"><i class="dash"></i> ≥ this many at 85% confidence</span>
+      <span style="color:var(--accent-95)"><i class="dash"></i> ≥ this many at 95% confidence</span>
+    </div>
+  </section>
+
+  <details class="assume">
+    <summary>Assumptions &amp; inputs</summary>
+    <div class="assume-body">
+      <div class="field">
+        <label for="in-backlog">Backlog size (items)</label>
+        <input id="in-backlog" type="number" min="1" step="1" value="62" />
+      </div>
+      <div class="field">
+        <label for="in-tp">Historical throughput / iteration</label>
+        <input id="in-tp" type="text" value="5, 4, 4, 5, 6, 4, 2, 3, 2, 5, 6" />
+        <span class="hint">comma-separated, items per 2-week iteration</span>
+      </div>
+      <div class="field">
+        <label for="in-start">Start date (Monday)</label>
+        <input id="in-start" type="date" value="2026-11-23" />
+      </div>
+      <div class="field">
+        <label for="in-target">Forecast window ends</label>
+        <input id="in-target" type="date" value="2027-03-31" />
+      </div>
+      <div class="field">
+        <label for="in-itlen">Iteration length (days)</label>
+        <input id="in-itlen" type="number" min="1" step="1" value="14" />
+      </div>
+      <div class="field">
+        <label for="in-creepmin">Scope creep min (%)</label>
+        <input id="in-creepmin" type="number" min="0" step="1" value="20" />
+      </div>
+      <div class="field">
+        <label for="in-creepmax">Scope creep max (%)</label>
+        <input id="in-creepmax" type="number" min="0" step="1" value="30" />
+      </div>
+      <div class="field">
+        <label for="in-trials">Trials</label>
+        <input id="in-trials" type="number" min="1000" step="1000" value="20000" />
+      </div>
+      <div class="assume-actions">
+        <button class="run-btn" id="runBtn" type="button">Run simulation</button>
+        <button class="reset-btn" id="resetBtn" type="button">Reset to defaults</button>
+        <span class="err" id="errMsg"></span>
+      </div>
+    </div>
+  </details>
+
+  <details class="tbl">
+    <summary>Show results as a table</summary>
+    <div id="tableWrap"></div>
+  </details>
+
+  <footer class="note" id="methodNote"></footer>
+</div>
+
+<div id="tip" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- helpers ----------
+  var MS_DAY = 86400000;
+  function parseDate(s){ var p = s.split("-"); return Date.UTC(+p[0], +p[1]-1, +p[2]); }
+  function addDays(ms, n){ return ms + n*MS_DAY; }
+  function fmtDate(ms){ return new Date(ms).toLocaleDateString("en-GB", {timeZone:"UTC", day:"numeric", month:"short", year:"numeric"}); }
+  function fmtDateShort(ms){ return new Date(ms).toLocaleDateString("en-GB", {timeZone:"UTC", day:"numeric", month:"short"}); }
+
+  // seeded RNG (Mulberry32) -> deterministic, reproducible forecast
+  function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+  // nearest-rank "by this value, q of trials are done" (ascending)
+  function pctAtMost(sorted, q){ var i = Math.ceil(q*sorted.length)-1; if(i<0)i=0; if(i>=sorted.length)i=sorted.length-1; return sorted[i]; }
+  // lower bound "at least this value with confidence q"
+  function pctAtLeast(sorted, q){ var i = Math.floor((1-q)*sorted.length); if(i<0)i=0; if(i>=sorted.length)i=sorted.length-1; return sorted[i]; }
+
+  // ---------- simulation ----------
+  function simulate(cfg){
+    var rng = mulberry32(cfg.seed);
+    var tp = cfg.throughput, n = tp.length, trials = cfg.trials, win = cfg.windowIters;
+    var iters = new Int32Array(trials);
+    var delivered = new Int32Array(trials);
+    var maxIter = 0;
+    for(var t=0; t<trials; t++){
+      var target = cfg.backlog;
+      if(cfg.creep){
+        var u = cfg.creepMin + rng()*(cfg.creepMax - cfg.creepMin);
+        target = Math.round(cfg.backlog*(1+u));
+      }
+      var done=0, it=0, win_del=0;
+      while(done < target && it < 2000){
+        var s = tp[(rng()*n)|0];
+        done += s; it++;
+        if(it<=win) win_del += s;
+      }
+      iters[t] = it;
+      if(it>maxIter) maxIter = it;
+      // items delivered inside the window, capped at the (possibly grown) backlog
+      delivered[t] = Math.min(win_del, target);
+    }
+    var sI = Int32Array.from(iters).sort(); var sD = Int32Array.from(delivered).sort();
+    return { iters:iters, delivered:delivered, sortedIters:sI, sortedDel:sD, maxIter:maxIter, trials:trials };
+  }
+
+  // ---------- state & config ----------
+  var SEED = 20262311;
+  var scenario = "A";
+  var cfg = null, resA = null, resB = null;
+
+  function readInputs(){
+    var tp = document.getElementById("in-tp").value.split(",").map(function(x){return parseFloat(x.trim());}).filter(function(x){return !isNaN(x) && x>=0;});
+    var backlog = parseInt(document.getElementById("in-backlog").value,10);
+    var startMs = parseDate(document.getElementById("in-start").value);
+    var targetMs = parseDate(document.getElementById("in-target").value);
+    var itlen = parseInt(document.getElementById("in-itlen").value,10);
+    var cmin = parseFloat(document.getElementById("in-creepmin").value)/100;
+    var cmax = parseFloat(document.getElementById("in-creepmax").value)/100;
+    var trials = parseInt(document.getElementById("in-trials").value,10);
+    var err = "";
+    if(!(backlog>0)) err = "Backlog must be a positive number.";
+    else if(tp.length===0 || tp.reduce(function(a,b){return a+b;},0)===0) err = "Enter at least one non-zero throughput value.";
+    else if(!(itlen>0)) err = "Iteration length must be positive.";
+    else if(isNaN(startMs)||isNaN(targetMs)||targetMs<=startMs) err = "Window end must be after the start date.";
+    else if(cmax<cmin) err = "Scope creep max must be ≥ min.";
+    else if(!(trials>=1000)) err = "Use at least 1000 trials.";
+    document.getElementById("errMsg").textContent = err;
+    if(err) return null;
+    var windowIters = Math.floor((targetMs - startMs)/(itlen*MS_DAY));
+    return { throughput:tp, backlog:backlog, startMs:startMs, targetMs:targetMs, itlen:itlen,
+             creepMin:cmin, creepMax:cmax, trials:trials, windowIters:windowIters, seed:SEED };
+  }
+
+  function runAll(){
+    var c = readInputs();
+    if(!c) return;
+    cfg = c;
+    resA = simulate(Object.assign({}, cfg, {creep:false}));
+    resB = simulate(Object.assign({}, cfg, {creep:true}));
+    render();
+  }
+
+  // ---------- stats for rendering ----------
+  function statsFor(res){
+    var it85 = pctAtMost(res.sortedIters, 0.85);
+    var it95 = pctAtMost(res.sortedIters, 0.95);
+    var it50 = pctAtMost(res.sortedIters, 0.50);
+    var del85 = pctAtLeast(res.sortedDel, 0.85);
+    var del95 = pctAtLeast(res.sortedDel, 0.95);
+    var del50 = pctAtMost(res.sortedDel, 0.50);
+    return {
+      it85:it85, it95:it95, it50:it50,
+      date85: addDays(cfg.startMs, it85*cfg.itlen),
+      date95: addDays(cfg.startMs, it95*cfg.itlen),
+      date50: addDays(cfg.startMs, it50*cfg.itlen),
+      del85:del85, del95:del95, del50:del50
+    };
+  }
+
+  // scope (for % remaining in creep scenario we use expected grown backlog)
+  function scopeInfo(res, isCreep){
+    if(!isCreep) return { lo:cfg.backlog, hi:cfg.backlog, mid:cfg.backlog };
+    var lo = Math.round(cfg.backlog*(1+cfg.creepMin));
+    var hi = Math.round(cfg.backlog*(1+cfg.creepMax));
+    return { lo:lo, hi:hi, mid:Math.round((lo+hi)/2) };
+  }
+
+  // ---------- render ----------
+  function render(){
+    var res = scenario==="A" ? resA : resB;
+    var isCreep = scenario==="B";
+    var st = statsFor(res);
+    var scope = scopeInfo(res, isCreep);
+    var seriesVar = isCreep ? "var(--series-b)" : "var(--series-a)";
+
+    // toggle buttons
+    document.querySelectorAll(".seg button").forEach(function(b){
+      b.setAttribute("aria-pressed", b.dataset.k===scenario ? "true":"false");
+    });
+    document.getElementById("runBtn").style.background = seriesVar;
+
+    // scenario note
+    var note = document.getElementById("scenarioNote");
+    if(isCreep){
+      note.innerHTML = "Target grows to <b>"+scope.lo+"–"+scope.hi+" items</b> (62 + 20–30% added mid-flight). Each trial draws its own creep level.";
+    } else {
+      note.innerHTML = "Fixed target of <b>"+cfg.backlog+" items</b>. No new work added during delivery.";
+    }
+
+    // window line
+    var winEndDate = addDays(cfg.startMs, cfg.windowIters*cfg.itlen);
+    document.getElementById("marchDesc").innerHTML =
+      "Forecast window = <b>"+cfg.windowIters+" iterations</b> (ends "+fmtDate(winEndDate)+"). " +
+      "Delivery is the same in both prognoses — scope creep changes what's <em>left</em>, not what you ship.";
+
+    // ---- KPI cards ----
+    var pctDone85 = Math.round(100*st.del85/scope.mid);
+    var remaining50 = Math.max(0, scope.mid - st.del50);
+    var kpis = [
+      { tag:"tag-85", tagTxt:"85% probability", label:"Finish everything by", value:fmtDate(st.date85), sub:"iteration "+st.it85+" · "+st.it85*cfg.itlen+" days from start" },
+      { tag:"tag-95", tagTxt:"95% probability", label:"Finish everything by", value:fmtDate(st.date95), sub:"iteration "+st.it95+" · conservative plan" },
+      { tag:"tag-50", tagTxt:"50% · coin-flip", label:"Likely finish (median)", value:fmtDate(st.date50), sub:"iteration "+st.it50 },
+      { tag:"tag-85", tagTxt:"by "+fmtDateShort(cfg.targetMs)+" 2027", label:"Items delivered", value:"≥ "+st.del85, sub:"with 85% confidence · ~"+pctDone85+"% of "+(isCreep?("~"+scope.mid):scope.mid)+" · 95%: ≥ "+st.del95 }
+    ];
+    var kHtml = kpis.map(function(k){
+      return '<div class="card"><span class="tag '+k.tag+'">'+k.tagTxt+'</span>'+
+             '<div class="k-label">'+k.label+'</div>'+
+             '<div class="k-value">'+k.value+'</div>'+
+             '<div class="k-sub">'+k.sub+'</div></div>';
+    }).join("");
+    document.getElementById("kpis").innerHTML = kHtml;
+
+    document.getElementById("trials-sub").textContent = cfg.trials.toLocaleString("en-GB");
+
+    // ---- charts ----
+    drawFinishHist(res, st, seriesVar);
+    drawCdf(res, st, seriesVar);
+    drawMarchHist(res, st, seriesVar, scope, isCreep);
+    drawTable(st, scope, isCreep);
+    drawMethod(isCreep, scope);
+  }
+
+  // ---- geometry helpers ----
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, text){
+    var e = document.createElementNS(SVGNS, tag);
+    for(var k in attrs){ e.setAttribute(k, attrs[k]); }
+    if(text!=null) e.textContent = text;
+    return e;
+  }
+  function clear(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+
+  // draw vertical percentile markers; merge ones on the same bucket, stack close labels
+  function drawMarkers(svg, m, ph, bw, lo, hi, marks){
+    var groups = {};
+    marks.forEach(function(mk){
+      if(mk.val<lo||mk.val>hi) return;
+      var key = mk.val;
+      if(!groups[key]) groups[key] = [];
+      groups[key].push(mk);
+    });
+    var placed = [];
+    Object.keys(groups).map(Number).sort(function(a,b){return a-b;}).forEach(function(val){
+      var grp = groups[val].sort(function(a,b){return a.rank-b.rank;});
+      var top = grp[grp.length-1]; // most conservative colour/line
+      var cx = m.l + (val-lo+0.5)*bw;
+      svg.appendChild(el("line",{x1:cx,y1:m.t-4,x2:cx,y2:m.t+ph,stroke:top.color,"stroke-width":2,"stroke-dasharray":"5 4"}));
+      var label = grp.map(function(g){return g.label;}).join(" / ");
+      // avoid horizontal label collisions by nudging y up for close neighbours
+      var y = m.t-8;
+      placed.forEach(function(p){ if(Math.abs(p.cx-cx) < 70 && p.y<=y) y = p.y-15; });
+      svg.appendChild(el("text",{x:cx,y:y,"text-anchor":"middle",fill:top.color,"font-size":11,"font-weight":700}, label));
+      placed.push({cx:cx,y:y});
+    });
+  }
+
+  // histogram of completion iteration (x = date/iteration)
+  function drawFinishHist(res, st, seriesVar){
+    var svg = document.getElementById("chartFinish");
+    clear(svg);
+    var W=820, H=340, m={t:24,r:16,b:58,l:46};
+    var pw=W-m.l-m.r, ph=H-m.t-m.b;
+
+    // bucket by iteration count, trim to [min, p99.5]
+    var lo = res.sortedIters[0];
+    var hi = pctAtMost(res.sortedIters, 0.995);
+    if(hi<=lo) hi=lo+1;
+    var nb = hi-lo+1;
+    var counts = new Array(nb).fill(0);
+    for(var i=0;i<res.iters.length;i++){
+      var v = res.iters[i]; if(v>hi) v=hi; if(v<lo) v=lo;
+      counts[v-lo]++;
+    }
+    var maxC = Math.max.apply(null, counts);
+    var bw = pw/nb;
+
+    // y gridlines
+    var ticks=4;
+    for(var g=0; g<=ticks; g++){
+      var yy = m.t + ph - (ph*g/ticks);
+      svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
+      svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11}, Math.round(maxC*g/ticks/res.trials*100)+"%"));
+    }
+    svg.appendChild(el("text",{x:14,y:m.t+ph/2,fill:"var(--muted)","font-size":11,transform:"rotate(-90 14 "+(m.t+ph/2)+")","text-anchor":"middle"},"share of trials"));
+
+    // bars
+    for(var b=0;b<nb;b++){
+      var itNum = lo+b;
+      var h = maxC? (counts[b]/maxC)*ph : 0;
+      var x = m.l + b*bw;
+      var y = m.t + ph - h;
+      var r = el("rect",{class:"bar", x:x+1, y:y, width:Math.max(0,bw-2), height:h, rx:3, fill:seriesVar});
+      var dt = addDays(cfg.startMs, itNum*cfg.itlen);
+      var pct = (counts[b]/res.trials*100);
+      r.addEventListener("mousemove", tipHandler("<b>Iteration "+itNum+"</b> — by "+fmtDate(dt)+"<br>"+counts[b].toLocaleString("en-GB")+" trials ("+pct.toFixed(1)+"%)"+(itNum>=hi&&hi<res.sortedIters[res.sortedIters.length-1]?" +later":"")));
+      r.addEventListener("mouseleave", tipHide);
+      svg.appendChild(r);
+
+      // sparse x labels (date)
+      if(b===0 || b===nb-1 || b%Math.ceil(nb/6)===0){
+        svg.appendChild(el("text",{x:x+bw/2,y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10}, fmtDateShort(dt)));
+        svg.appendChild(el("text",{x:x+bw/2,y:m.t+ph+30,"text-anchor":"middle",fill:"var(--muted)","font-size":9}, "it "+itNum));
+      }
+    }
+    // baseline
+    svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
+
+    // percentile markers (merge coincident ones so labels don't overprint)
+    drawMarkers(svg, m, ph, bw, lo, hi, [
+      {val:st.it50, color:"var(--text-2)", label:"50%", rank:0},
+      {val:st.it85, color:"var(--accent-85)", label:"85%", rank:1},
+      {val:st.it95, color:"var(--accent-95)", label:"95%", rank:2}
+    ]);
+
+    svg.appendChild(el("text",{x:m.l+pw/2,y:H-6,"text-anchor":"middle",fill:"var(--muted)","font-size":11},"completion date (end of iteration)"));
+  }
+
+  // CDF line
+  function drawCdf(res, st, seriesVar){
+    var svg = document.getElementById("chartCdf");
+    clear(svg);
+    var W=820,H=340,m={t:20,r:16,b:48,l:46};
+    var pw=W-m.l-m.r, ph=H-m.t-m.b;
+    var lo = 1;
+    var hi = pctAtMost(res.sortedIters,0.995);
+    var cum = [];
+    var c=0, idx=0;
+    // probability done by iteration k
+    var sorted = res.sortedIters;
+    for(var k=lo;k<=hi;k++){
+      while(idx<sorted.length && sorted[idx]<=k){ idx++; }
+      cum.push({k:k, p: idx/sorted.length});
+    }
+    function X(k){ return m.l + (hi>lo ? (k-lo)/(hi-lo)*pw : 0); }
+    function Y(p){ return m.t + ph - p*ph; }
+
+    // y grid 0..100%
+    for(var g=0; g<=5; g++){
+      var yy = m.t+ph-(ph*g/5);
+      svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
+      svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11}, (g*20)+"%"));
+    }
+    // 85 / 95 guide lines
+    [[0.85,"var(--accent-85)","85%"],[0.95,"var(--accent-95)","95%"]].forEach(function(gg){
+      var yy=Y(gg[0]);
+      svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:gg[1],"stroke-width":1.5,"stroke-dasharray":"5 4",opacity:0.9}));
+      svg.appendChild(el("text",{x:m.l+pw-2,y:yy-4,"text-anchor":"end",fill:gg[1],"font-size":10,"font-weight":700}, gg[2]));
+    });
+
+    // area + line
+    var dLine = "", dArea = "M "+X(lo)+" "+Y(0);
+    cum.forEach(function(pt,i){
+      var cmd=(i===0?"M":"L")+" "+X(pt.k)+" "+Y(pt.p);
+      dLine += cmd+" ";
+      dArea += " L "+X(pt.k)+" "+Y(pt.p);
+    });
+    dArea += " L "+X(hi)+" "+Y(0)+" Z";
+    svg.appendChild(el("path",{d:dArea, fill:seriesVar, opacity:0.12}));
+    svg.appendChild(el("path",{d:dLine, fill:"none", stroke:seriesVar, "stroke-width":2.5, "stroke-linejoin":"round"}));
+
+    // markers where curve crosses 85/95 -> drop to x axis
+    function drop(itNum,color){
+      var x=X(itNum);
+      svg.appendChild(el("line",{x1:x,y1:m.t,x2:x,y2:m.t+ph,stroke:color,"stroke-width":1.5,"stroke-dasharray":"3 4",opacity:0.8}));
+      svg.appendChild(el("circle",{cx:x,cy:Y(itNum===st.it85?0.85:(itNum===st.it95?0.95:0.5)),r:4,fill:color,stroke:"var(--surface)","stroke-width":1.5}));
+    }
+    drop(st.it85,"var(--accent-85)");
+    drop(st.it95,"var(--accent-95)");
+
+    // x axis: iteration + date labels
+    svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
+    var step=Math.max(1,Math.ceil((hi-lo)/7));
+    for(var kk=lo; kk<=hi; kk+=step){
+      var x=X(kk);
+      svg.appendChild(el("text",{x:x,y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10}, fmtDateShort(addDays(cfg.startMs,kk*cfg.itlen))));
+      svg.appendChild(el("text",{x:x,y:m.t+ph+29,"text-anchor":"middle",fill:"var(--muted)","font-size":9}, "it "+kk));
+    }
+
+    // invisible hover points
+    cum.forEach(function(pt){
+      var hit=el("rect",{x:X(pt.k)-(pw/(hi-lo)/2||6),y:m.t,width:(pw/(hi-lo)||12),height:ph,fill:"transparent"});
+      hit.addEventListener("mousemove", tipHandler("<b>By "+fmtDate(addDays(cfg.startMs,pt.k*cfg.itlen))+"</b><br>iteration "+pt.k+" — "+Math.round(pt.p*100)+"% chance all done"));
+      hit.addEventListener("mouseleave", tipHide);
+      svg.appendChild(hit);
+    });
+
+    svg.appendChild(el("text",{x:m.l+pw/2,y:H-4,"text-anchor":"middle",fill:"var(--muted)","font-size":11},"date (end of iteration)"));
+  }
+
+  // histogram of items delivered by window
+  function drawMarchHist(res, st, seriesVar, scope, isCreep){
+    var svg=document.getElementById("chartMarch");
+    clear(svg);
+    var W=820,H=340,m={t:24,r:16,b:46,l:46};
+    var pw=W-m.l-m.r, ph=H-m.t-m.b;
+    var lo=res.sortedDel[0], hi=res.sortedDel[res.sortedDel.length-1];
+    if(hi<=lo) hi=lo+1;
+    var nb=hi-lo+1;
+    var counts=new Array(nb).fill(0);
+    for(var i=0;i<res.delivered.length;i++){ counts[res.delivered[i]-lo]++; }
+    var maxC=Math.max.apply(null,counts);
+    var bw=pw/nb;
+
+    for(var g=0; g<=4; g++){
+      var yy=m.t+ph-(ph*g/4);
+      svg.appendChild(el("line",{x1:m.l,y1:yy,x2:m.l+pw,y2:yy,stroke:"var(--grid)","stroke-width":1}));
+      svg.appendChild(el("text",{x:m.l-8,y:yy+4,"text-anchor":"end",fill:"var(--muted)","font-size":11}, Math.round(maxC*g/4/res.trials*100)+"%"));
+    }
+    svg.appendChild(el("text",{x:14,y:m.t+ph/2,fill:"var(--muted)","font-size":11,transform:"rotate(-90 14 "+(m.t+ph/2)+")","text-anchor":"middle"},"share of trials"));
+
+    for(var b=0;b<nb;b++){
+      var val=lo+b;
+      var h=maxC?(counts[b]/maxC)*ph:0;
+      var x=m.l+b*bw, y=m.t+ph-h;
+      var r=el("rect",{class:"bar",x:x+1,y:y,width:Math.max(0,bw-2),height:h,rx:3,fill:seriesVar});
+      var pct=(counts[b]/res.trials*100);
+      r.addEventListener("mousemove", tipHandler("<b>"+val+" items</b> delivered<br>"+counts[b].toLocaleString("en-GB")+" trials ("+pct.toFixed(1)+"%)"));
+      r.addEventListener("mouseleave", tipHide);
+      svg.appendChild(r);
+      if(b===0||b===nb-1||b%Math.ceil(nb/10)===0){
+        svg.appendChild(el("text",{x:x+bw/2,y:m.t+ph+16,"text-anchor":"middle",fill:"var(--muted)","font-size":10}, val));
+      }
+    }
+    svg.appendChild(el("line",{x1:m.l,y1:m.t+ph,x2:m.l+pw,y2:m.t+ph,stroke:"var(--axis)","stroke-width":1}));
+
+    drawMarkers(svg, m, ph, bw, lo, hi, [
+      {val:st.del85, color:"var(--accent-85)", label:"85%: ≥"+st.del85, rank:1},
+      {val:st.del95, color:"var(--accent-95)", label:"95%: ≥"+st.del95, rank:2}
+    ]);
+
+    svg.appendChild(el("text",{x:m.l+pw/2,y:H-6,"text-anchor":"middle",fill:"var(--muted)","font-size":11},"items delivered by "+fmtDate(addDays(cfg.startMs,cfg.windowIters*cfg.itlen))));
+  }
+
+  function drawTable(st, scope, isCreep){
+    var winEnd = fmtDate(addDays(cfg.startMs, cfg.windowIters*cfg.itlen));
+    var rows = [
+      ["Finish all items — 50% (median)", fmtDate(st.date50), "iteration "+st.it50],
+      ["Finish all items — 85% probability", fmtDate(st.date85), "iteration "+st.it85],
+      ["Finish all items — 95% probability", fmtDate(st.date95), "iteration "+st.it95],
+      ["Items by "+winEnd+" — median (50%)", st.del50+" items", Math.round(100*st.del50/scope.mid)+"% of "+(isCreep?"~":"")+scope.mid],
+      ["Items by "+winEnd+" — ≥ at 85%", st.del85+" items", Math.round(100*st.del85/scope.mid)+"% of "+(isCreep?"~":"")+scope.mid],
+      ["Items by "+winEnd+" — ≥ at 95%", st.del95+" items", Math.round(100*st.del95/scope.mid)+"% of "+(isCreep?"~":"")+scope.mid]
+    ];
+    var html='<table><thead><tr><th>Metric ('+(isCreep?"+scope creep":"fixed scope")+')</th><th>Result</th><th>Detail</th></tr></thead><tbody>';
+    rows.forEach(function(r){ html+='<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td></tr>'; });
+    html+='</tbody></table>';
+    document.getElementById("tableWrap").innerHTML=html;
+  }
+
+  function drawMethod(isCreep, scope){
+    var mean=(cfg.throughput.reduce(function(a,b){return a+b;},0)/cfg.throughput.length);
+    var html = "Method: "+cfg.trials.toLocaleString("en-GB")+" Monte Carlo trials. Each iteration's throughput is drawn at random "+
+      "(with replacement) from your "+cfg.throughput.length+" historical values ["+cfg.throughput.join(", ")+"], "+
+      "mean "+mean.toFixed(2)+" items/iteration. Iterations are "+cfg.itlen+" days, starting "+fmtDate(cfg.startMs)+". "+
+      "Percentiles use the nearest-rank method; results are deterministic (fixed random seed) so the forecast is stable on reload. "+
+      (isCreep ? ("Scope-creep prognosis: each trial adds "+Math.round(cfg.creepMin*100)+"–"+Math.round(cfg.creepMax*100)+"% new items (target "+scope.lo+"–"+scope.hi+").")
+               : "Fixed-scope prognosis: no new work added.");
+    document.getElementById("methodNote").textContent = html;
+  }
+
+  // ---------- tooltip ----------
+  var tip=document.getElementById("tip");
+  function tipHandler(html){ return function(e){ tip.innerHTML=html; tip.style.opacity=1; var x=e.clientX+14,y=e.clientY+14; if(x>window.innerWidth-250)x=e.clientX-220; tip.style.left=x+"px"; tip.style.top=y+"px"; }; }
+  function tipHide(){ tip.style.opacity=0; }
+
+  // ---------- events ----------
+  document.querySelectorAll(".seg button").forEach(function(b){
+    b.addEventListener("click", function(){ scenario=b.dataset.k; if(cfg) render(); });
+  });
+  document.getElementById("runBtn").addEventListener("click", runAll);
+  document.getElementById("resetBtn").addEventListener("click", function(){
+    document.getElementById("in-backlog").value=62;
+    document.getElementById("in-tp").value="5, 4, 4, 5, 6, 4, 2, 3, 2, 5, 6";
+    document.getElementById("in-start").value="2026-11-23";
+    document.getElementById("in-target").value="2027-03-31";
+    document.getElementById("in-itlen").value=14;
+    document.getElementById("in-creepmin").value=20;
+    document.getElementById("in-creepmax").value=30;
+    document.getElementById("in-trials").value=20000;
+    runAll();
+  });
+
+  // theme toggle
+  var themeBtn=document.getElementById("themeBtn");
+  themeBtn.addEventListener("click", function(){
+    var root=document.documentElement;
+    var cur=root.getAttribute("data-theme");
+    var mqDark=window.matchMedia("(prefers-color-scheme: dark)").matches;
+    var next;
+    if(!cur) next = mqDark ? "light" : "dark";
+    else if(cur==="dark") next="light"; else next="dark";
+    root.setAttribute("data-theme", next);
+    try{ localStorage.setItem("mc-theme", next); }catch(e){}
+    if(cfg) render();
+  });
+  try{ var saved=localStorage.getItem("mc-theme"); if(saved) document.documentElement.setAttribute("data-theme", saved); }catch(e){}
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(){ if(cfg) render(); });
+
+  // go
+  runAll();
+})();
+</script>
 </body>
 </html>
